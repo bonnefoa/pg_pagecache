@@ -3,78 +3,44 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 
+	"log/slog"
+
+	"github.com/bonnefoa/pg_pagecache/app"
 	"github.com/jackc/pgx/v5"
 )
-
-var (
-	pgdata        string
-	database      string
-	connectString string
-)
-
-type FileToRelation map[uint32]string
-
-func init() {
-	flag.StringVar(&pgdata, "pgData", "", "Location of pgdata, uses PGDATA env var if not defined")
-	flag.StringVar(&connectString, "", "", "Connection string to PostgreSQL")
-}
-
-func getFileToRelation(ctx context.Context, conn *pgx.Conn) (fileToRelation FileToRelation, err error) {
-	rows, err := conn.Query(ctx, "SELECT relname, relfilenode::int FROM pg_class WHERE relfilenode > 0")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting list of relfilenode from pg_class: %v\n", err)
-		return
-	}
-
-	for rows.Next() {
-		var relname string
-		var relfilenode uint32
-		err = rows.Scan(&relname, relfilenode)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting list of relfilenode from pg_class: %v\n", err)
-			return
-		}
-		fileToRelation[relfilenode] = relname
-	}
-
-	return
-}
 
 func main() {
 	ctx := context.Background()
 	flag.Parse()
 
-	//	if pgdata == "" {
-	//		pgdata, found := os.LookupEnv("PGDATA")
-	//		if !found {
-	//			flag.Usage()
-	//			os.Exit(1)
-	//		}
-	//	}
-
-	conn, err := pgx.Connect(ctx, connectString)
+	cliArgs, err := app.ParseCliArgs()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		slog.Error("Error while parsing arguments", "error", err)
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	// Get the db connection
+	conn, err := pgx.Connect(ctx, cliArgs.ConnectString)
+	if err != nil {
+		slog.Error("Unable to connect to database", "error", err)
 		os.Exit(1)
 	}
 	defer conn.Close(ctx)
 
-	var database string
-	err = conn.QueryRow(ctx, "select current_database()").Scan(&database)
+	// Build PgPagecache struct
+	pgPagecache, err := app.NewPgPagecache(ctx, conn, cliArgs)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current database: %v\n", err)
+		slog.Any("error", err)
 		os.Exit(1)
 	}
 
-	fileToRelation, err := getFileToRelation(ctx, conn)
+	// Run it
+	err = pgPagecache.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting file to relation mapping: %v\n", err)
+		slog.Any("error", err)
 		os.Exit(1)
 	}
-
-	fmt.Printf("Working on database %s", database)
-	fmt.Printf("Found %d files", len(fileToRelation))
 }

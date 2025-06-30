@@ -71,7 +71,7 @@ func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
 
 // outputRelinfos prints one line per relation
 func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
-	fmt.Print("Relation,PageCount,PageCached\n")
+	fmt.Print("Relation,PageCached,PageCount,PercentCached\n")
 	for i, relinfo := range relinfos {
 		if p.OutputOptions.Limit > 0 && i >= p.OutputOptions.Limit {
 			return
@@ -79,14 +79,15 @@ func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
 		if relinfo.PcStats.PageCached < p.OutputOptions.Threshold {
 			return
 		}
-		fmt.Printf("%s,%d,%d\n", relinfo.Relname, relinfo.PcStats.PageCount, relinfo.PcStats.PageCached)
+		pctCached := 100 * float32(relinfo.PcStats.PageCached) / float32(relinfo.PcStats.PageCount)
+		fmt.Printf("%s,%d,%d,%.2f\n", relinfo.Relname, relinfo.PcStats.PageCached, relinfo.PcStats.PageCount, pctCached)
 	}
 }
 
 // outputRelinfosGroupedChildren prints relations with their children
 func (p *PgPagecache) outputRelinfosGroupedChildren(relinfos []relation.RelInfo) {
 	// Parent With Children
-	fmt.Print("Parent,Relation,PageCount,PageCached\n")
+	fmt.Print("Parent,Relation,PageCached,PageCount,PercentCached\n")
 	for i, parent := range relinfos {
 		if p.OutputOptions.Limit > 0 && i >= p.OutputOptions.Limit {
 			return
@@ -96,12 +97,14 @@ func (p *PgPagecache) outputRelinfosGroupedChildren(relinfos []relation.RelInfo)
 		}
 
 		// Print the parent
-		fmt.Printf("%s,,%d,%d\n", parent.Relname, parent.PcStats.PageCount, parent.PcStats.PageCached)
+		pctCached := 100 * float32(parent.PcStats.PageCached) / float32(parent.PcStats.PageCount)
+		fmt.Printf("%s,,%d,%d,%.2f\n", parent.Relname, parent.PcStats.PageCached, parent.PcStats.PageCount, pctCached)
 
 		children := p.fetchChildren(&parent)
 		p.sortRelInfos(children)
 		for _, child := range children {
-			fmt.Printf("%s,%s,%d,%d\n", parent.Relname, child.Relname, child.PcStats.PageCount, child.PcStats.PageCached)
+			pctCached := 100 * float32(child.PcStats.PageCached) / float32(child.PcStats.PageCount)
+			fmt.Printf("%s,%s,%d,%d,%.2f\n", parent.Relname, child.Relname, child.PcStats.PageCached, child.PcStats.PageCount, pctCached)
 		}
 
 	}

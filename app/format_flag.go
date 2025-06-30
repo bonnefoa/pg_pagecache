@@ -8,6 +8,7 @@ import (
 
 type OutputAggregation int
 type OutputSort int
+type FormatUnit int
 
 const (
 	SortRelation OutputSort = iota
@@ -19,6 +20,11 @@ const (
 	AggRelation OutputAggregation = iota
 	AggOnlyParent
 	AggParentWithChildren
+
+	UnitPage FormatUnit = iota
+	UnitKB
+	UnitMB
+	UnitGB
 )
 
 var (
@@ -34,7 +40,15 @@ var (
 		"parent_with_children": AggParentWithChildren,
 	}
 
+	formatUnitMap = map[string]FormatUnit{
+		"page": UnitPage,
+		"kb":   UnitKB,
+		"mb":   UnitMB,
+		"gb":   UnitGB,
+	}
+
 	formatOptions   OutputOptions
+	unitFlag        string
 	sortFlag        string
 	aggregationFlag string
 )
@@ -42,6 +56,7 @@ var (
 func init() {
 	flag.IntVar(&formatOptions.Threshold, "threshold", 0, "Don't format file if cached pages are under the provided threshold. -1 to format everything")
 	flag.IntVar(&formatOptions.Limit, "limit", -1, "Maximum number of results to format. -1 to format everything.")
+	flag.StringVar(&unitFlag, "unit", "page", "Unit to use for paeg count and page cached. Can be page, kb or MB")
 	flag.StringVar(&sortFlag, "sort", "pagecached", "Field to use for sort. Can be relation, pagecount or pagecached")
 	flag.StringVar(&aggregationFlag, "aggregation", "relation", "How to aggregate results. relation, parent_only, parent_with_children")
 }
@@ -71,6 +86,15 @@ func parseOutputAggregation(s string) (OutputAggregation, error) {
 	return agg, nil
 }
 
+func parseUnitFlag(s string) (FormatUnit, error) {
+	res, ok := formatUnitMap[strings.ToLower(s)]
+	if !ok {
+		err := fmt.Errorf("Unknown unit: %v\n", s)
+		return res, err
+	}
+	return res, nil
+}
+
 func ParseOutputOptions() (OutputOptions, error) {
 	var err error
 	formatOptions.Sort, err = parseSortOutput(sortFlag)
@@ -78,6 +102,10 @@ func ParseOutputOptions() (OutputOptions, error) {
 		return formatOptions, err
 	}
 	formatOptions.Aggregation, err = parseOutputAggregation(aggregationFlag)
+	if err != nil {
+		return formatOptions, err
+	}
+	formatOptions.Unit, err = parseUnitFlag(unitFlag)
 	if err != nil {
 		return formatOptions, err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"runtime/pprof"
 
 	"log/slog"
 
@@ -20,6 +21,20 @@ func main() {
 		slog.Error("Error while parsing arguments", "error", err)
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	if cliArgs.Cpuprofile != "" {
+		f, err := os.Create(cliArgs.Cpuprofile)
+		if err != nil {
+			slog.Error("could not create CPU profile", "error", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			slog.Error("could not start CPU profile", "error", err)
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
 	}
 
 	// Get the db connection

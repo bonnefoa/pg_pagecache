@@ -21,6 +21,7 @@ type CliArgs struct {
 	PageThreshold       int
 	CachedPageThreshold int
 	Limit               int
+	Cpuprofile          string
 
 	OutputOptions
 }
@@ -30,6 +31,7 @@ func init() {
 	flag.StringVar(&cliArgs.ConnectString, "connect_str", "", "Connection string to PostgreSQL")
 	flag.IntVar(&cliArgs.PageThreshold, "page_threshold", 0, "Exclude relations pages under the threshold. -1 to display everything")
 	flag.IntVar(&cliArgs.CachedPageThreshold, "cached_page_threshold", 0, "Exclude relations with cached pages under the threshold. -1 to display everything")
+	flag.StringVar(&cliArgs.Cpuprofile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&relationsFlag, "relations", "", "Filter on a specific relations (separated with commas)")
 }
 

@@ -31,14 +31,14 @@ func main() {
 	defer conn.Close(ctx)
 
 	// Build PgPagecache struct
-	pgPagecache, err := app.NewPgPagecache(ctx, conn, cliArgs)
+	pgPagecache, err := app.NewPgPagecache(conn, cliArgs)
 	if err != nil {
 		slog.Any("error", err)
 		os.Exit(1)
 	}
 
 	// Run it
-	err = pgPagecache.Run()
+	err = pgPagecache.Run(ctx)
 	if err != nil {
 		slog.Any("error", err)
 		os.Exit(1)

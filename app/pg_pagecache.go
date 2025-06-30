@@ -91,6 +91,7 @@ func (p *PgPagecache) fillPcStats() error {
 		p.fileToRelinfo[relfilenode] = relinfo
 		slog.Debug("Adding relinfo", "Relation", relinfo.Relname, "filename", filename, "pagecached", pcStats.PageCached)
 	}
+	slog.Info("Pagestats finished")
 	return nil
 }
 
@@ -116,7 +117,8 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 		err = fmt.Errorf("Error getting file to relation mapping: %v\n", err)
 		return
 	}
-	slog.Info("Fetched fileToRelinfo", "length", len(p.fileToRelinfo))
+	slog.Info("Found relations matching page threshold", "numbers", len(p.fileToRelinfo), "page_threshold", p.PageThreshold)
+
 	// Detect page size
 	p.page_size = pcstats.GetPageSize()
 	slog.Info("Detected Page size", "page_size", p.page_size)

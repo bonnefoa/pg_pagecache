@@ -21,6 +21,7 @@ type PgPagecache struct {
 
 	dbid          uint32
 	database      string
+	page_size     int64
 	fileToRelinfo relation.FileToRelinfo
 	relToRelinfo  relation.RelToRelinfo
 }
@@ -74,7 +75,7 @@ func (p *PgPagecache) fillPcStats() error {
 		}
 
 		fullPath := filepath.Join(baseDir, filename)
-		pcStats, err := pcstats.GetPcStats(fullPath)
+		pcStats, err := pcstats.GetPcStats(fullPath, p.page_size)
 		if err != nil {
 			return err
 		}
@@ -116,6 +117,9 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 		return
 	}
 	slog.Info("Fetched fileToRelinfo", "length", len(p.fileToRelinfo))
+	// Detect page size
+	p.page_size = pcstats.GetPageSize()
+	slog.Info("Detected Page size", "page_size", p.page_size)
 
 	// Go through all known file and fill their PcStats
 	err = p.fillPcStats()

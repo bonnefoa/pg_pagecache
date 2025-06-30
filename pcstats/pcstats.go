@@ -22,7 +22,11 @@ func (p *PcStats) Add(b PcStats) {
 	p.PageCached += b.PageCached
 }
 
-func getPagecacheStats(fd int, size int64) (PcStats, error) {
+func GetPageSize() int64 {
+	return int64(os.Getpagesize())
+}
+
+func getPagecacheStats(fd int, size int64, pageSize int64) (PcStats, error) {
 	var mmap []byte
 	pcStats := PcStats{}
 	// void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset);
@@ -37,7 +41,6 @@ func getPagecacheStats(fd int, size int64) (PcStats, error) {
 
 	// Build the result vec. From mincore doc: The vec argument must point to an
 	// array containing at least (length+PAGE_SIZE-1) / PAGE_SIZE bytes
-	pageSize := int64(os.Getpagesize())
 	vecSize := (size + pageSize - 1) / pageSize
 	vec := make([]byte, vecSize)
 
@@ -62,7 +65,7 @@ func getPagecacheStats(fd int, size int64) (PcStats, error) {
 	return pcStats, nil
 }
 
-func GetPcStats(fullPath string) (PcStats, error) {
+func GetPcStats(fullPath string, pagesize int64) (PcStats, error) {
 	pcStats := PcStats{}
 	file, err := os.Open(fullPath)
 	if err != nil {
@@ -77,7 +80,7 @@ func GetPcStats(fullPath string) (PcStats, error) {
 	if fileSize == 0 {
 		return pcStats, nil
 	}
-	pcStats, err = getPagecacheStats(int(file.Fd()), fileInfo.Size())
+	pcStats, err = getPagecacheStats(int(file.Fd()), fileInfo.Size(), pagesize)
 	if err != nil {
 		return pcStats, fmt.Errorf("Getting pagecache stats for %s failed: %v", fullPath, err)
 	}

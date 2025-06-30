@@ -58,7 +58,7 @@ func GetFileToRelinfo(ctx context.Context, conn *pgx.Conn, relations []string, p
 	if len(relations) > 0 {
 		rows, err = conn.Query(ctx, `SELECT C.relname, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 FROM pg_class C
-WHERE relname=ANY($1) AND repages > $2`, pq.Array(relations), pageThreshold)
+WHERE relname=ANY($1) AND relpages > $2`, pq.Array(relations), pageThreshold)
 	} else {
 		rows, err = conn.Query(ctx, `SELECT C.relname, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 FROM pg_class C

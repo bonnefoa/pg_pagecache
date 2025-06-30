@@ -71,7 +71,7 @@ func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
 
 // outputRelinfos prints one line per relation
 func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
-	fmt.Print("Relation,PageCached,PageCount,PercentCached\n")
+	fmt.Print("Relation,Relkind,PageCached,PageCount,PercentCached\n")
 	for i, relinfo := range relinfos {
 		if p.OutputOptions.Limit > 0 && i >= p.OutputOptions.Limit {
 			return
@@ -80,7 +80,7 @@ func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
 			return
 		}
 		pctCached := 100 * float32(relinfo.PcStats.PageCached) / float32(relinfo.PcStats.PageCount)
-		fmt.Printf("%s,%d,%d,%.2f\n", relinfo.Relname, relinfo.PcStats.PageCached, relinfo.PcStats.PageCount, pctCached)
+		fmt.Printf("%s,%s,%d,%d,%.2f\n", relinfo.Relname, relation.KindToString(relinfo.Relkind), relinfo.PcStats.PageCached, relinfo.PcStats.PageCount, pctCached)
 	}
 }
 
@@ -104,7 +104,7 @@ func (p *PgPagecache) outputRelinfosGroupedChildren(relinfos []relation.RelInfo)
 		p.sortRelInfos(children)
 		for _, child := range children {
 			pctCached := 100 * float32(child.PcStats.PageCached) / float32(child.PcStats.PageCount)
-			fmt.Printf("%s,%s,%d,%d,%.2f\n", parent.Relname, child.Relname, child.PcStats.PageCached, child.PcStats.PageCount, pctCached)
+			fmt.Printf("%s,%s,%s,%d,%d,%.2f\n", parent.Relname, child.Relname, relation.KindToString(child.Relkind), child.PcStats.PageCached, child.PcStats.PageCount, pctCached)
 		}
 
 	}

@@ -14,7 +14,7 @@ type TableToRelations map[string][]string
 
 // GetTableToRelations returns the mapping between a table parent and its child
 // Child includes toast table, toast table index and all indexes of the parent relation
-func getTableToRelations(ctx context.Context, conn *pgx.Conn) (tableToRelations TableToRelations, err error) {
+func getTableToRelations(ctx context.Context, conn *pgx.Conn, pageThreshold int) (tableToRelations TableToRelations, err error) {
 	rows, err := conn.Query(ctx, `SELECT COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname), C.relname
 		FROM pg_class C
 		LEFT JOIN pg_index ON pg_index.indexrelid = C.oid
@@ -25,7 +25,8 @@ func getTableToRelations(ctx context.Context, conn *pgx.Conn) (tableToRelations 
 
 		-- toast index to toast table
 		LEFT JOIN pg_class PTI ON pg_index.indrelid = PTI.oid AND PTI.relkind='t'
-		LEFT JOIN pg_class PPTI ON PPTI.reltoastrelid = PTI.oid`)
+		LEFT JOIN pg_class PPTI ON PPTI.reltoastrelid = PTI.oid
+		WHERE C.relpages > $1`, pageThreshold)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting list of relfilenode from pg_class: %v\n", err)
 		return
@@ -49,7 +50,7 @@ func getTableToRelations(ctx context.Context, conn *pgx.Conn) (tableToRelations 
 
 // GetFileToRelinfo returns the mapping between relfilenode and the relation
 func GetFileToRelinfo(ctx context.Context, conn *pgx.Conn, relations []string, pageThreshold int) (fileToRelinfo FileToRelinfo, err error) {
-	tableToRelations, err := getTableToRelations(ctx, conn)
+	tableToRelations, err := getTableToRelations(ctx, conn, pageThreshold)
 	if err != nil {
 		return
 	}

@@ -57,13 +57,13 @@ func GetFileToRelinfo(ctx context.Context, conn *pgx.Conn, relations []string, p
 
 	var rows pgx.Rows
 	if len(relations) > 0 {
-		rows, err = conn.Query(ctx, `SELECT C.relname, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
+		rows, err = conn.Query(ctx, `SELECT C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 FROM pg_class C
-WHERE relname=ANY($1) AND relpages > $2`, pq.Array(relations), pageThreshold)
+WHERE relname=ANY($1) AND relpages > $2 AND relkind = ANY('{r,i,t,m,p,I}')`, pq.Array(relations), pageThreshold)
 	} else {
-		rows, err = conn.Query(ctx, `SELECT C.relname, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
+		rows, err = conn.Query(ctx, `SELECT C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 FROM pg_class C
-WHERE relpages > $1`, pageThreshold)
+WHERE relpages > $1 AND relkind = ANY('{r,i,t,m,p,I}')`, pageThreshold)
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting list of relfilenode from pg_class: %v\n", err)
@@ -73,16 +73,35 @@ WHERE relpages > $1`, pageThreshold)
 	fileToRelinfo = make(FileToRelinfo, 0)
 	for rows.Next() {
 		var relname string
+		var relkind rune
 		var relfilenode uint32
-		err = rows.Scan(&relname, &relfilenode)
+		err = rows.Scan(&relname, &relkind, &relfilenode)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting list of relfilenode from pg_class: %v\n", err)
 			return
 		}
 
 		children := tableToRelations[relname]
-		fileToRelinfo[relfilenode] = RelInfo{relfilenode, relname, pcstats.PcStats{}, children}
+		fileToRelinfo[relfilenode] = RelInfo{relfilenode, relname, relkind, pcstats.PcStats{}, children}
 	}
 
 	return
+}
+
+func KindToString(kind rune) string {
+	switch kind {
+	case 'r':
+		return "Relation"
+	case 'i':
+		return "Index"
+	case 'm':
+		return "Materialised View"
+	case 't':
+		return "TOAST"
+	case 'p':
+		return "Partitioned Tabled"
+	case 'I':
+		return "Partitioned Index"
+	}
+	return "Unkown"
 }

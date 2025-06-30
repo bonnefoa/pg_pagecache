@@ -84,7 +84,7 @@ func (p *PgPagecache) fillPcStats() error {
 			continue
 		}
 		if k%1000 == 0 {
-			slog.Info("Getting pagestas", "current_entry", k, "num_entries", num_entries)
+			slog.Info("Getting pagestats", "current_entry", k, "num_entries", num_entries)
 		}
 
 		relinfo.PcStats.Add(pcStats)

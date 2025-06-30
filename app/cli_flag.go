@@ -19,8 +19,9 @@ type CliArgs struct {
 	ConnectString string
 	Relations     []string
 	PageThreshold int
+	Limit         int
 
-	DisplayOptions DisplayOptions
+	OutputOptions OutputOptions
 }
 
 func init() {
@@ -36,7 +37,7 @@ func ParseCliArgs() (CliArgs, error) {
 	if err != nil {
 		return cliArgs, err
 	}
-	cliArgs.DisplayOptions, err = ParseDisplayOptions()
+	cliArgs.OutputOptions, err = ParseOutputOptions()
 	if err != nil {
 		return cliArgs, err
 	}

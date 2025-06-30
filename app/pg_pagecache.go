@@ -16,9 +16,9 @@ import (
 )
 
 type PgPagecache struct {
-	conn           *pgx.Conn
-	pgData         string
-	displayOptions DisplayOptions
+	conn          *pgx.Conn
+	pgData        string
+	OutputOptions OutputOptions
 
 	dbid          uint32
 	database      string
@@ -98,7 +98,7 @@ func (p *PgPagecache) fillPcStats() error {
 func NewPgPagecache(ctx context.Context, conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPagecache, err error) {
 	pgPagecache.conn = conn
 	pgPagecache.pgData = cliArgs.PgData
-	pgPagecache.displayOptions = cliArgs.DisplayOptions
+	pgPagecache.OutputOptions = cliArgs.OutputOptions
 
 	// Fetch dbid and database
 	err = conn.QueryRow(ctx, "select oid, datname from pg_database where datname=current_database()").Scan(&pgPagecache.dbid, &pgPagecache.database)
@@ -132,7 +132,7 @@ func (p *PgPagecache) Run() (err error) {
 		p.relToRelinfo[v.Relname] = v
 	}
 
-	p.displayResults()
+	p.OutputResults()
 
 	return
 }

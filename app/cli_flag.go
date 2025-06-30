@@ -14,20 +14,22 @@ var (
 )
 
 type CliArgs struct {
-	PgData        string
-	Database      string
-	ConnectString string
-	Relations     []string
-	PageThreshold int
-	Limit         int
+	PgData              string
+	Database            string
+	ConnectString       string
+	Relations           []string
+	PageThreshold       int
+	CachedPageThreshold int
+	Limit               int
 
-	OutputOptions OutputOptions
+	OutputOptions
 }
 
 func init() {
 	flag.StringVar(&cliArgs.PgData, "pgData", "", "Location of pgdata, uses PGDATA env var if not defined")
 	flag.StringVar(&cliArgs.ConnectString, "connect_str", "", "Connection string to PostgreSQL")
-	flag.IntVar(&cliArgs.PageThreshold, "page_threshold", 10, "Exclude relations with less pages than the threshold")
+	flag.IntVar(&cliArgs.PageThreshold, "page_threshold", 0, "Exclude relations pages under the threshold. -1 to display everything")
+	flag.IntVar(&cliArgs.CachedPageThreshold, "cached_page_threshold", 0, "Exclude relations with cached pages under the threshold. -1 to display everything")
 	flag.StringVar(&relationsFlag, "relations", "", "Filter on a specific relations (separated with commas)")
 }
 

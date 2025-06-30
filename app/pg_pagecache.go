@@ -16,9 +16,8 @@ import (
 )
 
 type PgPagecache struct {
-	conn          *pgx.Conn
-	pgData        string
-	OutputOptions OutputOptions
+	CliArgs
+	conn *pgx.Conn
 
 	dbid          uint32
 	database      string
@@ -43,7 +42,7 @@ func extractRelfilenode(filename string) (relfilenode uint32, err error) {
 
 // fillPcStats iterate over fileToRelinfo and fetch page cache stats
 func (p *PgPagecache) fillPcStats() error {
-	baseDir := fmt.Sprintf("%s/base/%d", p.pgData, p.dbid)
+	baseDir := fmt.Sprintf("%s/base/%d", p.PgData, p.dbid)
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
 		return fmt.Errorf("Error listing file: %v", err)
@@ -95,31 +94,29 @@ func (p *PgPagecache) fillPcStats() error {
 }
 
 // NewPgPagecache fetches the active database id and name and creates the PgPagecache instance
-func NewPgPagecache(ctx context.Context, conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPagecache, err error) {
+func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPagecache, err error) {
 	pgPagecache.conn = conn
-	pgPagecache.pgData = cliArgs.PgData
-	pgPagecache.OutputOptions = cliArgs.OutputOptions
+	pgPagecache.CliArgs = cliArgs
+	return
+}
 
+func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	// Fetch dbid and database
-	err = conn.QueryRow(ctx, "select oid, datname from pg_database where datname=current_database()").Scan(&pgPagecache.dbid, &pgPagecache.database)
+	err = p.conn.QueryRow(ctx, "select oid, datname from pg_database where datname=current_database()").Scan(&p.dbid, &p.database)
 	if err != nil {
 		err = fmt.Errorf("Error getting current database: %v\n", err)
 		return
 	}
-	slog.Debug("Fetched database details", "database", pgPagecache.database, "dbid", pgPagecache.dbid)
+	slog.Info("Fetched database details", "database", p.database, "dbid", p.dbid)
 
 	// Fill the file -> relinfo map
-	pgPagecache.fileToRelinfo, err = relation.GetFileToRelinfo(ctx, conn, cliArgs.Relations, cliArgs.PageThreshold)
+	p.fileToRelinfo, err = relation.GetFileToRelinfo(ctx, p.conn, p.Relations, p.PageThreshold)
 	if err != nil {
 		err = fmt.Errorf("Error getting file to relation mapping: %v\n", err)
 		return
 	}
-	slog.Debug("Fetched fileToRelinfo", "length", len(pgPagecache.fileToRelinfo))
+	slog.Info("Fetched fileToRelinfo", "length", len(p.fileToRelinfo))
 
-	return
-}
-
-func (p *PgPagecache) Run() (err error) {
 	// Go through all known file and fill their PcStats
 	err = p.fillPcStats()
 	if err != nil {
@@ -128,8 +125,12 @@ func (p *PgPagecache) Run() (err error) {
 
 	// Build the relname -> relinfo map
 	p.relToRelinfo = make(relation.RelToRelinfo, 0)
-	for _, v := range p.fileToRelinfo {
-		p.relToRelinfo[v.Relname] = v
+	for k, v := range p.fileToRelinfo {
+		if v.PcStats.PageCached <= p.CachedPageThreshold {
+			delete(p.fileToRelinfo, k)
+		} else {
+			p.relToRelinfo[v.Relname] = v
+		}
 	}
 
 	p.OutputResults()

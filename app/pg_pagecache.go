@@ -10,6 +10,7 @@ import (
 
 	"log/slog"
 
+	"github.com/bonnefoa/pg_pagecache/meminfo"
 	"github.com/bonnefoa/pg_pagecache/pcstats"
 	"github.com/bonnefoa/pg_pagecache/relation"
 	"github.com/jackc/pgx/v5"
@@ -22,6 +23,7 @@ type PgPagecache struct {
 	dbid          uint32
 	database      string
 	page_size     int64
+	cached_memory int64
 	fileToRelinfo relation.FileToRelinfo
 	relToRelinfo  relation.RelToRelinfo
 }
@@ -128,6 +130,14 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
+
+	p.cached_memory, err = meminfo.GetCachedMemory(p.page_size)
+	if err != nil {
+		slog.Warn("Couldn't get cached_memory", "error", err)
+	} else {
+		slog.Info("Detected cached memory usage", "cached_memory", p.cached_memory)
+	}
+
 
 	// Build the relname -> relinfo map
 	p.relToRelinfo = make(relation.RelToRelinfo, 0)

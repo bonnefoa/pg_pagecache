@@ -3,6 +3,7 @@ package pcstats
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"unsafe"
 
 	"syscall"
@@ -63,6 +64,22 @@ func getPagecacheStats(fd int, size int64, pageSize int64) (PcStats, error) {
 	}
 
 	return pcStats, nil
+}
+
+func (p *PcStats) GetCachedPct() string {
+	if p.PageCached > 0 {
+		value := 100 * float64(p.PageCached) / float64(p.PageCount)
+		return strconv.FormatFloat(value, 'f', 2, 64)
+	}
+	return "0"
+}
+
+func (p *PcStats) GetTotalCachedPct(totalCached int64) string {
+	if p.PageCached > 0 && totalCached > 0 {
+		value := 100 * float64(p.PageCached) / float64(totalCached)
+		return strconv.FormatFloat(value, 'f', 2, 64)
+	}
+	return "0"
 }
 
 func GetPcStats(fullPath string, pagesize int64) (PcStats, error) {

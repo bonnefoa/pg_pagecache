@@ -6,18 +6,23 @@ import (
 	"strings"
 )
 
-type OutputAggregation int
-type OutputSort int
+type FormatAggregation int
+type FormatSort int
 type FormatUnit int
 
-const (
-	SortRelation OutputSort = iota
-	SortPageCached
-	SortPageCount
-)
+type OutputOptions struct {
+	Unit        FormatUnit
+	Limit       int
+	Sort        FormatSort
+	Aggregation FormatAggregation
+}
 
 const (
-	AggRelation OutputAggregation = iota
+	SortRelation FormatSort = iota
+	SortPageCached
+	SortPageCount
+
+	AggNone FormatAggregation = iota
 	AggOnlyParent
 	AggParentWithChildren
 
@@ -28,14 +33,14 @@ const (
 )
 
 var (
-	sortOutputMap = map[string]OutputSort{
+	sortOutputMap = map[string]FormatSort{
 		"relation":   SortRelation,
 		"pagecached": SortPageCached,
 		"pagecount":  SortPageCount,
 	}
 
-	formatAggregationMap = map[string]OutputAggregation{
-		"relation":             AggRelation,
+	formatAggregationMap = map[string]FormatAggregation{
+		"none":                 AggNone,
 		"parent_only":          AggOnlyParent,
 		"parent_with_children": AggParentWithChildren,
 	}
@@ -54,21 +59,13 @@ var (
 )
 
 func init() {
-	flag.IntVar(&formatOptions.Threshold, "threshold", 0, "Don't format file if cached pages are under the provided threshold. -1 to format everything")
 	flag.IntVar(&formatOptions.Limit, "limit", -1, "Maximum number of results to format. -1 to format everything.")
 	flag.StringVar(&unitFlag, "unit", "page", "Unit to use for paeg count and page cached. Can be page, kb or MB")
 	flag.StringVar(&sortFlag, "sort", "pagecached", "Field to use for sort. Can be relation, pagecount or pagecached")
-	flag.StringVar(&aggregationFlag, "aggregation", "relation", "How to aggregate results. relation, parent_only, parent_with_children")
+	flag.StringVar(&aggregationFlag, "aggregation", "none", "How to aggregate results. relation, parent_only, parent_with_children")
 }
 
-type OutputOptions struct {
-	Threshold   int
-	Limit       int
-	Sort        OutputSort
-	Aggregation OutputAggregation
-}
-
-func parseSortOutput(s string) (OutputSort, error) {
+func parseSortOutput(s string) (FormatSort, error) {
 	sortOutput, ok := sortOutputMap[strings.ToLower(s)]
 	if !ok {
 		err := fmt.Errorf("Unknown sort: %v\n", s)
@@ -77,7 +74,7 @@ func parseSortOutput(s string) (OutputSort, error) {
 	return sortOutput, nil
 }
 
-func parseOutputAggregation(s string) (OutputAggregation, error) {
+func parseOutputAggregation(s string) (FormatAggregation, error) {
 	agg, ok := formatAggregationMap[strings.ToLower(s)]
 	if !ok {
 		err := fmt.Errorf("Unknown aggregation: %v\n", s)

@@ -10,7 +10,7 @@ type FormatAggregation int
 type FormatSort int
 type FormatUnit int
 
-type OutputOptions struct {
+type FormatOptions struct {
 	Unit        FormatUnit
 	Limit       int
 	Sort        FormatSort
@@ -52,7 +52,7 @@ var (
 		"gb":   UnitGB,
 	}
 
-	formatOptions   OutputOptions
+	formatOptions   FormatOptions
 	unitFlag        string
 	sortFlag        string
 	aggregationFlag string
@@ -65,7 +65,7 @@ func init() {
 	flag.StringVar(&aggregationFlag, "aggregation", "none", "How to aggregate results. relation, parent_only, parent_with_children")
 }
 
-func parseSortOutput(s string) (FormatSort, error) {
+func parseSort(s string) (FormatSort, error) {
 	sortOutput, ok := sortOutputMap[strings.ToLower(s)]
 	if !ok {
 		err := fmt.Errorf("Unknown sort: %v\n", s)
@@ -74,7 +74,7 @@ func parseSortOutput(s string) (FormatSort, error) {
 	return sortOutput, nil
 }
 
-func parseOutputAggregation(s string) (FormatAggregation, error) {
+func parseAggregation(s string) (FormatAggregation, error) {
 	agg, ok := formatAggregationMap[strings.ToLower(s)]
 	if !ok {
 		err := fmt.Errorf("Unknown aggregation: %v\n", s)
@@ -92,13 +92,13 @@ func parseUnitFlag(s string) (FormatUnit, error) {
 	return res, nil
 }
 
-func ParseOutputOptions() (OutputOptions, error) {
+func ParseFormatOptions() (FormatOptions, error) {
 	var err error
-	formatOptions.Sort, err = parseSortOutput(sortFlag)
+	formatOptions.Sort, err = parseSort(sortFlag)
 	if err != nil {
 		return formatOptions, err
 	}
-	formatOptions.Aggregation, err = parseOutputAggregation(aggregationFlag)
+	formatOptions.Aggregation, err = parseAggregation(aggregationFlag)
 	if err != nil {
 		return formatOptions, err
 	}

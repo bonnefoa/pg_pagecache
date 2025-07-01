@@ -145,9 +145,8 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	}
 
 	if p.Aggregation == AggNone {
-		p.formatNoAggregation()
+		return p.formatNoAggregation()
 	} else {
-		p.formatAggregated()
+		return p.formatAggregated()
 	}
-	return
 }

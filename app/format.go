@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
@@ -44,12 +45,31 @@ func (p *PgPagecache) formatValue(value int) string {
 	panic("Unreachable code")
 }
 
-func (p *PgPagecache) outputValues(values [][]string) error {
-	if p.Type == FormatCSV {
+func (p *PgPagecache) outputValues(valuesWithHeader [][]string) error {
+	values := valuesWithHeader
+	if p.NoHeader {
+		values = valuesWithHeader[1:]
+	}
+	switch p.Type {
+	case FormatCSV:
 		w := csv.NewWriter(os.Stdout)
 		w.WriteAll(values)
 		return w.Error()
-	} else {
+	case FormatJson:
+		m := make([]map[string]string, 0)
+		for _, line := range valuesWithHeader[1:] {
+			o := make(map[string]string, 0)
+			for i, k := range valuesWithHeader[0] {
+				o[k] = line[i]
+			}
+			m = append(m, o)
+		}
+		res, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		fmt.Print(string(res))
+	case FormatColumn:
 		w := tabwriter.NewWriter(os.Stdout, 14, 0, 1, ' ', 0)
 		for _, v := range values {
 			fmt.Fprintln(w, strings.Join(v, "\t"))
@@ -60,14 +80,12 @@ func (p *PgPagecache) outputValues(values [][]string) error {
 }
 
 // outputRelinfos prints one line per relation
-func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
+func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) error {
 	strValues := make([][]string, 0)
-	if !p.NoHeader {
-		strValues = append(strValues, []string{"Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
-	}
+	strValues = append(strValues, []string{"Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
 	for i, relinfo := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
-			return
+			break
 		}
 		strValues = append(strValues, []string{relinfo.Relname, relation.KindToString(relinfo.Relkind),
 			p.formatValue(relinfo.PcStats.PageCached),
@@ -75,12 +93,12 @@ func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
 			relinfo.PcStats.GetCachedPct(),
 			relinfo.PcStats.GetTotalCachedPct(p.cached_memory)})
 	}
-	p.outputValues(strValues)
+	return p.outputValues(strValues)
 }
 
-func (p *PgPagecache) formatNoAggregation() {
+func (p *PgPagecache) formatNoAggregation() error {
 	// No aggregation
 	relinfos := slices.Collect(maps.Values(p.fileToRelinfo))
 	p.sortRelInfos(relinfos)
-	p.outputRelinfos(relinfos)
+	return p.outputRelinfos(relinfos)
 }

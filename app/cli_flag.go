@@ -23,7 +23,7 @@ type CliArgs struct {
 	Limit               int
 	Cpuprofile          string
 
-	OutputOptions
+	FormatOptions
 }
 
 func init() {
@@ -41,7 +41,7 @@ func ParseCliArgs() (CliArgs, error) {
 	if err != nil {
 		return cliArgs, err
 	}
-	cliArgs.OutputOptions, err = ParseOutputOptions()
+	cliArgs.FormatOptions, err = ParseFormatOptions()
 	if err != nil {
 		return cliArgs, err
 	}

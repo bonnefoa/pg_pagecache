@@ -10,5 +10,4 @@ type RelInfo struct {
 	Children    []string
 }
 
-type RelToRelinfo map[string]RelInfo
 type FileToRelinfo map[uint32]RelInfo

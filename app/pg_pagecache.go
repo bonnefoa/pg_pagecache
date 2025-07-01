@@ -25,7 +25,6 @@ type PgPagecache struct {
 	page_size     int64
 	cached_memory int64
 	fileToRelinfo relation.FileToRelinfo
-	relToRelinfo  relation.RelToRelinfo
 }
 
 func extractRelfilenode(filename string) (relfilenode uint32, err error) {
@@ -138,18 +137,17 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 		slog.Info("Detected cached memory usage", "cached_memory", p.cached_memory)
 	}
 
-
-	// Build the relname -> relinfo map
-	p.relToRelinfo = make(relation.RelToRelinfo, 0)
+	// Filter out relations under the cached threshold
 	for k, v := range p.fileToRelinfo {
 		if v.PcStats.PageCached <= p.CachedPageThreshold {
 			delete(p.fileToRelinfo, k)
-		} else {
-			p.relToRelinfo[v.Relname] = v
 		}
 	}
 
-	p.OutputResults()
-
+	if p.OutputOptions.Aggregation == AggNone {
+		p.formatNoAggregation()
+	} else {
+		p.formatAggregated()
+	}
 	return
 }

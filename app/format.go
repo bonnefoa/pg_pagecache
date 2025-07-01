@@ -42,7 +42,9 @@ func (p *PgPagecache) formatValue(value int) string {
 
 // outputRelinfos prints one line per relation
 func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
-	fmt.Print("Relation,Kind,PageCached,PageCount,PercentCached,PercentTotal\n")
+	if !p.NoHeader {
+		fmt.Print("Relation,Kind,PageCached,PageCount,PercentCached,PercentTotal\n")
+	}
 	for i, relinfo := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			return

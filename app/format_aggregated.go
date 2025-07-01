@@ -62,20 +62,13 @@ func (p *PgPagecache) outputRelinfosAggregated(relinfos []relation.RelInfo, relT
 		children := p.fetchChildren(&parent, relToRelinfo)
 		if len(children) > 1 {
 			// Only show parent when it has multiple children
-			strValues = append(strValues, []string{parent.Relname, "-", "-",
-				p.formatValue(parent.PcStats.PageCached),
-				p.formatValue(parent.PcStats.PageCount),
-				parent.PcStats.GetCachedPct(),
-				parent.PcStats.GetTotalCachedPct(p.cached_memory)})
+			parentRelinfo := relation.RelInfo{Relname: "-", Relkind: '-', PcStats: parent.PcStats}
+			strValues = append(strValues, parentRelinfo.ToStringArrayParent(parent.Relname, p.Unit, p.page_size, p.cached_memory))
 		}
 
 		p.sortRelInfos(children)
 		for _, child := range children {
-			strValues = append(strValues, []string{parent.Relname, child.Relname,
-				relation.KindToString(child.Relkind),
-				p.formatValue(child.PcStats.PageCached),
-				p.formatValue(child.PcStats.PageCount),
-				child.PcStats.GetCachedPct(), child.PcStats.GetTotalCachedPct(p.cached_memory)})
+			strValues = append(strValues, child.ToStringArrayParent(parent.Relname, p.Unit, p.page_size, p.cached_memory))
 		}
 	}
 	return p.outputValues(strValues)

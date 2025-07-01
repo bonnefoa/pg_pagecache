@@ -102,6 +102,11 @@ func KindToString(kind rune) string {
 		return "Partitioned Tabled"
 	case 'I':
 		return "Partitioned Index"
+	// Artificial kind for our total line
+	case 'T':
+		return "Total"
+	case '-':
+		return "-"
 	}
 	return "Unkown"
 }

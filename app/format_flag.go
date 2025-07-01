@@ -36,6 +36,7 @@ const (
 
 	FormatCSV = iota
 	FormatColumn
+	FormatJson
 )
 
 var (
@@ -61,6 +62,7 @@ var (
 	formatTypeMap = map[string]FormatType{
 		"csv":    FormatCSV,
 		"column": FormatColumn,
+		"json":   FormatJson,
 	}
 
 	formatOptions   FormatOptions
@@ -73,7 +75,7 @@ var (
 func init() {
 	flag.IntVar(&formatOptions.Limit, "limit", -1, "Maximum number of results to format. -1 to format everything.")
 	flag.BoolVar(&formatOptions.NoHeader, "no_header", false, "Don't print header if true.")
-	flag.StringVar(&typeFlag, "format", "csv", "Output format to use. Can be csv or column")
+	flag.StringVar(&typeFlag, "format", "csv", "Output format to use. Can be csv, column or json")
 	flag.StringVar(&unitFlag, "unit", "page", "Unit to use for paeg count and page cached. Can be page, kb or MB")
 	flag.StringVar(&sortFlag, "sort", "pagecached", "Field to use for sort. Can be relation, pagecount or pagecached")
 	flag.StringVar(&aggregationFlag, "aggregation", "none", "How to aggregate results. relation, parent_only, parent_with_children")

@@ -50,15 +50,13 @@ func (p *PgPagecache) getAggregatedRelinfos(relToRelinfo RelToRelinfo) (relinfos
 }
 
 // outputRelinfosAggregated prints relations with their children
-func (p *PgPagecache) outputRelinfosAggregated(relinfos []relation.RelInfo, relToRelinfo RelToRelinfo) {
+func (p *PgPagecache) outputRelinfosAggregated(relinfos []relation.RelInfo, relToRelinfo RelToRelinfo) error {
 	strValues := make([][]string, 0)
 	// Parent With Children
-	if !p.NoHeader {
-		strValues = append(strValues, []string{"Parent", "Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
-	}
+	strValues = append(strValues, []string{"Parent", "Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
 	for i, parent := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
-			return
+			break
 		}
 
 		children := p.fetchChildren(&parent, relToRelinfo)
@@ -80,10 +78,10 @@ func (p *PgPagecache) outputRelinfosAggregated(relinfos []relation.RelInfo, relT
 				child.PcStats.GetCachedPct(), child.PcStats.GetTotalCachedPct(p.cached_memory)})
 		}
 	}
-	p.outputValues(strValues)
+	return p.outputValues(strValues)
 }
 
-func (p *PgPagecache) formatAggregated() {
+func (p *PgPagecache) formatAggregated() error {
 	// Build the relname -> relinfo map
 	relToRelinfo := make(RelToRelinfo, 0)
 	for _, v := range p.fileToRelinfo {
@@ -96,5 +94,5 @@ func (p *PgPagecache) formatAggregated() {
 	// sort it
 	p.sortRelInfos(relinfos)
 
-	p.outputRelinfosAggregated(relinfos, relToRelinfo)
+	return p.outputRelinfosAggregated(relinfos, relToRelinfo)
 }

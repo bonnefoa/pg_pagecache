@@ -55,7 +55,7 @@ func (p *PgPagecache) outputRelinfosAggregated(relinfos []relation.RelInfo, relT
 	// Parent With Children
 	fmt.Print("Parent,Relation,Kind,PageCached,PageCount,PercentCached,PercentTotal\n")
 	for i, parent := range relinfos {
-		if p.OutputOptions.Limit > 0 && i >= p.OutputOptions.Limit {
+		if p.Limit > 0 && i >= p.Limit {
 			return
 		}
 

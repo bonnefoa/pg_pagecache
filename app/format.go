@@ -12,7 +12,7 @@ import (
 
 func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
 	sort.Slice(r, func(i, j int) bool {
-		switch p.OutputOptions.Sort {
+		switch p.Sort {
 		case SortRelation:
 			return r[i].Relname > r[j].Relname
 		case SortPageCached:
@@ -27,7 +27,7 @@ func (p *PgPagecache) formatValue(value int) string {
 	kb := float64(1024)
 	mb := float64(1024 * 1024)
 	gb := float64(1024 * 1024 * 1024)
-	switch p.OutputOptions.Unit {
+	switch p.Unit {
 	case UnitPage:
 		return strconv.FormatInt(int64(value), 10)
 	case UnitKB:
@@ -44,7 +44,7 @@ func (p *PgPagecache) formatValue(value int) string {
 func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
 	fmt.Print("Relation,Kind,PageCached,PageCount,PercentCached,PercentTotal\n")
 	for i, relinfo := range relinfos {
-		if p.OutputOptions.Limit > 0 && i >= p.OutputOptions.Limit {
+		if p.Limit > 0 && i >= p.Limit {
 			return
 		}
 		fmt.Printf("%s,%s,%s,%s,%s,%s\n",

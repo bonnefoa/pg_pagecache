@@ -20,7 +20,6 @@ type CliArgs struct {
 	Relations           []string
 	PageThreshold       int
 	CachedPageThreshold int
-	Limit               int
 	Cpuprofile          string
 
 	FormatOptions

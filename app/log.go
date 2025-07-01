@@ -17,7 +17,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&logLevelFlag, "log", "INFO", "Log level")
+	flag.StringVar(&logLevelFlag, "log", "warning", "Log level")
 }
 
 func SetLogLevel() error {

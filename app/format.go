@@ -1,11 +1,15 @@
 package app
 
 import (
+	"encoding/csv"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
@@ -40,23 +44,38 @@ func (p *PgPagecache) formatValue(value int) string {
 	panic("Unreachable code")
 }
 
+func (p *PgPagecache) outputValues(values [][]string) error {
+	if p.Type == FormatCSV {
+		w := csv.NewWriter(os.Stdout)
+		w.WriteAll(values)
+		return w.Error()
+	} else {
+		w := tabwriter.NewWriter(os.Stdout, 14, 0, 1, ' ', 0)
+		for _, v := range values {
+			fmt.Fprintln(w, strings.Join(v, "\t"))
+		}
+		w.Flush()
+	}
+	return nil
+}
+
 // outputRelinfos prints one line per relation
 func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) {
+	strValues := make([][]string, 0)
 	if !p.NoHeader {
-		fmt.Print("Relation,Kind,PageCached,PageCount,PercentCached,PercentTotal\n")
+		strValues = append(strValues, []string{"Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
 	}
 	for i, relinfo := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			return
 		}
-		fmt.Printf("%s,%s,%s,%s,%s,%s\n",
-			relinfo.Relname,
-			relation.KindToString(relinfo.Relkind),
+		strValues = append(strValues, []string{relinfo.Relname, relation.KindToString(relinfo.Relkind),
 			p.formatValue(relinfo.PcStats.PageCached),
 			p.formatValue(relinfo.PcStats.PageCount),
 			relinfo.PcStats.GetCachedPct(),
-			relinfo.PcStats.GetTotalCachedPct(p.cached_memory))
+			relinfo.PcStats.GetTotalCachedPct(p.cached_memory)})
 	}
+	p.outputValues(strValues)
 }
 
 func (p *PgPagecache) formatNoAggregation() {

@@ -4,15 +4,16 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+
+	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
 type FormatAggregation int
 type FormatSort int
-type FormatUnit int
 type FormatType int
 
 type FormatOptions struct {
-	Unit        FormatUnit
+	Unit        relation.FormatUnit
 	Limit       int
 	Type        FormatType
 	Sort        FormatSort
@@ -28,11 +29,6 @@ const (
 	AggNone FormatAggregation = iota
 	AggOnlyParent
 	AggParentWithChildren
-
-	UnitPage FormatUnit = iota
-	UnitKB
-	UnitMB
-	UnitGB
 
 	FormatCSV = iota
 	FormatColumn
@@ -52,11 +48,11 @@ var (
 		"parent_with_children": AggParentWithChildren,
 	}
 
-	formatUnitMap = map[string]FormatUnit{
-		"page": UnitPage,
-		"kb":   UnitKB,
-		"mb":   UnitMB,
-		"gb":   UnitGB,
+	formatUnitMap = map[string]relation.FormatUnit{
+		"page": relation.UnitPage,
+		"kb":   relation.UnitKB,
+		"mb":   relation.UnitMB,
+		"gb":   relation.UnitGB,
 	}
 
 	formatTypeMap = map[string]FormatType{
@@ -99,7 +95,7 @@ func parseAggregation(s string) (FormatAggregation, error) {
 	return agg, nil
 }
 
-func parseUnitFlag(s string) (FormatUnit, error) {
+func parseUnitFlag(s string) (relation.FormatUnit, error) {
 	res, ok := formatUnitMap[strings.ToLower(s)]
 	if !ok {
 		err := fmt.Errorf("Unknown unit: %v\n", s)

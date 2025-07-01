@@ -8,7 +8,6 @@ import (
 	"os"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -26,23 +25,6 @@ func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
 			return r[i].PcStats.PageCount > r[j].PcStats.PageCount
 		}
 	})
-}
-
-func (p *PgPagecache) formatValue(value int) string {
-	kb := float64(1024)
-	mb := float64(1024 * 1024)
-	gb := float64(1024 * 1024 * 1024)
-	switch p.Unit {
-	case UnitPage:
-		return strconv.FormatInt(int64(value), 10)
-	case UnitKB:
-		return strconv.FormatFloat(float64(int64(value)*p.page_size)/kb, 'f', -1, 64)
-	case UnitMB:
-		return strconv.FormatFloat(float64(int64(value)*p.page_size)/mb, 'f', 2, 64)
-	case UnitGB:
-		return strconv.FormatFloat(float64(int64(value)*p.page_size)/gb, 'f', 2, 64)
-	}
-	panic("Unreachable code")
 }
 
 func (p *PgPagecache) outputValues(valuesWithHeader [][]string) error {
@@ -81,18 +63,17 @@ func (p *PgPagecache) outputValues(valuesWithHeader [][]string) error {
 
 // outputRelinfos prints one line per relation
 func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) error {
+	total := relation.RelInfo{Relname: "Total", Relkind: 'T'}
 	strValues := make([][]string, 0)
 	strValues = append(strValues, []string{"Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
 	for i, relinfo := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			break
 		}
-		strValues = append(strValues, []string{relinfo.Relname, relation.KindToString(relinfo.Relkind),
-			p.formatValue(relinfo.PcStats.PageCached),
-			p.formatValue(relinfo.PcStats.PageCount),
-			relinfo.PcStats.GetCachedPct(),
-			relinfo.PcStats.GetTotalCachedPct(p.cached_memory)})
+		strValues = append(strValues, relinfo.ToStringArray(p.Unit, p.page_size, p.cached_memory))
+		total.PcStats.Add(relinfo.PcStats)
 	}
+	strValues = append(strValues, total.ToStringArray(p.Unit, p.page_size, p.cached_memory))
 	return p.outputValues(strValues)
 }
 

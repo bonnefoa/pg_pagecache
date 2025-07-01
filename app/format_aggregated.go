@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/bonnefoa/pg_pagecache/relation"
@@ -52,32 +51,36 @@ func (p *PgPagecache) getAggregatedRelinfos(relToRelinfo RelToRelinfo) (relinfos
 
 // outputRelinfosAggregated prints relations with their children
 func (p *PgPagecache) outputRelinfosAggregated(relinfos []relation.RelInfo, relToRelinfo RelToRelinfo) {
+	strValues := make([][]string, 0)
 	// Parent With Children
 	if !p.NoHeader {
-		fmt.Print("Parent,Relation,Kind,PageCached,PageCount,PercentCached,PercentTotal\n")
+		strValues = append(strValues, []string{"Parent", "Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
 	}
 	for i, parent := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			return
 		}
 
-		// Print the parent
-		fmt.Printf("%s,,Parent,%s,%s,%s,%s\n", parent.Relname,
-			p.formatValue(parent.PcStats.PageCached),
-			p.formatValue(parent.PcStats.PageCount),
-			parent.PcStats.GetCachedPct(),
-			parent.PcStats.GetTotalCachedPct(p.cached_memory))
-
 		children := p.fetchChildren(&parent, relToRelinfo)
+		if len(children) > 1 {
+			// Only show parent when it has multiple children
+			strValues = append(strValues, []string{parent.Relname, "-", "-",
+				p.formatValue(parent.PcStats.PageCached),
+				p.formatValue(parent.PcStats.PageCount),
+				parent.PcStats.GetCachedPct(),
+				parent.PcStats.GetTotalCachedPct(p.cached_memory)})
+		}
+
 		p.sortRelInfos(children)
 		for _, child := range children {
-			fmt.Printf("%s,%s,%s,%s,%s,%s,%s\n", parent.Relname, child.Relname,
+			strValues = append(strValues, []string{parent.Relname, child.Relname,
 				relation.KindToString(child.Relkind),
 				p.formatValue(child.PcStats.PageCached),
 				p.formatValue(child.PcStats.PageCount),
-				child.PcStats.GetCachedPct(), child.PcStats.GetTotalCachedPct(p.cached_memory))
+				child.PcStats.GetCachedPct(), child.PcStats.GetTotalCachedPct(p.cached_memory)})
 		}
 	}
+	p.outputValues(strValues)
 }
 
 func (p *PgPagecache) formatAggregated() {

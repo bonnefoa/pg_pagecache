@@ -24,6 +24,20 @@ const (
 type FileToRelinfo map[uint32]RelInfo
 type FormatUnit int
 
+func UnitToString(u FormatUnit) string {
+	switch u {
+	case UnitPage:
+		return "Page"
+	case UnitKB:
+		return "KB"
+	case UnitMB:
+		return "MB"
+	case UnitGB:
+		return "GB"
+	}
+	return "?"
+}
+
 func formatValue(value int, unit FormatUnit, page_size int64) string {
 	kb := float64(1024)
 	mb := float64(1024 * 1024)

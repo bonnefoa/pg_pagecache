@@ -27,7 +27,7 @@ type CliArgs struct {
 }
 
 func init() {
-	flag.StringVar(&cliArgs.PgData, "pgData", "", "Location of pgdata, uses PGDATA env var if not defined")
+	flag.StringVar(&cliArgs.PgData, "pg_data", "", "Location of pgdata, uses PGDATA env var if not defined")
 	flag.StringVar(&cliArgs.ConnectString, "connect_str", "", "Connection string to PostgreSQL")
 	flag.IntVar(&cliArgs.PageThreshold, "page_threshold", 0, "Exclude relations pages under the threshold. -1 to display everything")
 	flag.IntVar(&cliArgs.CachedPageThreshold, "cached_page_threshold", 0, "Exclude relations with cached pages under the threshold. -1 to display everything")

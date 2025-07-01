@@ -65,7 +65,10 @@ func (p *PgPagecache) outputValues(valuesWithHeader [][]string) error {
 func (p *PgPagecache) outputRelinfos(relinfos []relation.RelInfo) error {
 	total := relation.RelInfo{Relname: "Total", Relkind: 'T'}
 	strValues := make([][]string, 0)
-	strValues = append(strValues, []string{"Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
+	strValues = append(strValues, []string{"Relation", "Kind",
+		fmt.Sprintf("PageCached (%s)", relation.UnitToString(p.Unit)),
+		fmt.Sprintf("PageCount (%s)", relation.UnitToString(p.Unit)),
+		"%Cached", "%Total"})
 	for i, relinfo := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			break

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/bonnefoa/pg_pagecache/relation"
@@ -53,7 +54,10 @@ func (p *PgPagecache) getAggregatedRelinfos(relToRelinfo RelToRelinfo) (relinfos
 func (p *PgPagecache) outputRelinfosAggregated(relinfos []relation.RelInfo, relToRelinfo RelToRelinfo) error {
 	strValues := make([][]string, 0)
 	// Parent With Children
-	strValues = append(strValues, []string{"Parent", "Relation", "Kind", "PageCached", "PageCount", "%Cached", "%Total"})
+	strValues = append(strValues, []string{"Parent", "Relation", "Kind",
+		fmt.Sprintf("PageCached (%s)", relation.UnitToString(p.Unit)),
+		fmt.Sprintf("PageCount (%s)", relation.UnitToString(p.Unit)),
+		"%Cached", "%Total"})
 	for i, parent := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			break

@@ -11,11 +11,12 @@ import (
 )
 
 type TableToRelations map[string][]string
+type TableToPartitions map[string][]string
 
 // GetTableToRelations returns the mapping between a table parent and its child
 // Child includes toast table, toast table index and all indexes of the parent relation
 func getTableToRelations(ctx context.Context, conn *pgx.Conn, pageThreshold int) (tableToRelations TableToRelations, err error) {
-	rows, err := conn.Query(ctx, `SELECT COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname), C.relname
+	rows, err := conn.Query(ctx, `SELECT COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, array_agg(C.relname)
 		FROM pg_class C
 		LEFT JOIN pg_index ON pg_index.indexrelid = C.oid
 		-- index to parent table
@@ -26,7 +27,9 @@ func getTableToRelations(ctx context.Context, conn *pgx.Conn, pageThreshold int)
 		-- toast index to toast table
 		LEFT JOIN pg_class PTI ON pg_index.indrelid = PTI.oid AND PTI.relkind='t'
 		LEFT JOIN pg_class PPTI ON PPTI.reltoastrelid = PTI.oid
-		WHERE C.relpages > $1`, pageThreshold)
+		WHERE C.relpages > $1
+		GROUP BY t
+`, pageThreshold)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting list of relfilenode from pg_class: %v\n", err)
 		return
@@ -35,15 +38,38 @@ func getTableToRelations(ctx context.Context, conn *pgx.Conn, pageThreshold int)
 	tableToRelations = make(TableToRelations, 0)
 	for rows.Next() {
 		var table string
-		var relname string
-		err = rows.Scan(&table, &relname)
+		var relations []string
+		err = rows.Scan(&table, &relations)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting table to relation from pg_class: %v\n", err)
-			return
+			return nil, fmt.Errorf("Error getting table to relation from pg_class: %v", err)
 		}
-		lst := tableToRelations[table]
-		lst = append(lst, relname)
-		tableToRelations[table] = lst
+		tableToRelations[table] = relations
+	}
+	return
+}
+
+func getParentToPartitions(ctx context.Context, conn *pgx.Conn) (tableToPartitions TableToPartitions, err error) {
+	rows, err := conn.Query(ctx, `SELECT C.relname, array_agg(child.relname)
+		FROM pg_class C
+		JOIN pg_inherits inh ON inh.inhparent = C.oid
+		JOIN pg_class child ON inh.inhrelid = child.oid
+		WHERE C.relkind = 'p'
+		GROUP BY C.relname
+		`)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting list of relfilenode from pg_class: %v\n", err)
+		return
+	}
+
+	tableToPartitions = make(TableToPartitions, 0)
+	for rows.Next() {
+		var table string
+		var partitions []string
+		err = rows.Scan(&table, &partitions)
+		if err != nil {
+			return nil, fmt.Errorf("Error getting table to partitions from pg_class: %v", err)
+		}
+		tableToPartitions[table] = partitions
 	}
 	return
 }

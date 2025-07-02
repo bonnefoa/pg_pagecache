@@ -10,9 +10,9 @@ import (
 type RelToRelinfo map[string]relation.RelInfo
 
 // For a specific relinfo, fetch the list of children sorted
-func (p *PgPagecache) fetchChildren(parent *relation.RelInfo, relToRelinfo RelToRelinfo) (relinfos []relation.RelInfo) {
+func (p *PgPagecache) fetchChildren(table *relation.RelInfo, relToRelinfo RelToRelinfo) (relinfos []relation.RelInfo) {
 	relinfos = make([]relation.RelInfo, 0)
-	for _, childRelname := range parent.Children {
+	for _, childRelname := range table.Children {
 		childRelinfo, present := relToRelinfo[childRelname]
 		if present {
 			relinfos = append(relinfos, childRelinfo)
@@ -23,17 +23,17 @@ func (p *PgPagecache) fetchChildren(parent *relation.RelInfo, relToRelinfo RelTo
 
 func (p *PgPagecache) getAggregatedRelinfos(relToRelinfo RelToRelinfo) (relinfos []relation.RelInfo) {
 	relinfos = make([]relation.RelInfo, 0)
-	for _, parent := range p.fileToRelinfo {
+	for _, table := range p.fileToRelinfo {
 
-		if len(parent.Children) == 0 {
+		if len(table.Children) == 0 {
 			// It's a child, skip it
 			continue
 		}
 
-		slog.Debug("Processing parent", "Relation", parent.Relname)
-		for _, childRelname := range parent.Children {
-			if parent.Relname == childRelname {
-				// Parent page stats is already included in the base relation
+		slog.Debug("Processing table", "Relation", table.Relname)
+		for _, childRelname := range table.Children {
+			if table.Relname == childRelname {
+				// table page stats is already included in the base relation
 				continue
 			}
 
@@ -42,10 +42,10 @@ func (p *PgPagecache) getAggregatedRelinfos(relToRelinfo RelToRelinfo) (relinfos
 				continue
 			}
 			slog.Debug("Processing children", "Relation", childRelname, "PageCount", childRelinfo.PcStats.PageCount)
-			parent.PcStats.Add(childRelinfo.PcStats)
+			table.PcStats.Add(childRelinfo.PcStats)
 		}
 		// Add it to the list
-		relinfos = append(relinfos, parent)
+		relinfos = append(relinfos, table)
 	}
 	return relinfos
 }
@@ -53,26 +53,30 @@ func (p *PgPagecache) getAggregatedRelinfos(relToRelinfo RelToRelinfo) (relinfos
 // outputRelinfosAggregated prints relations with their children
 func (p *PgPagecache) outputRelinfosAggregated(relinfos []relation.RelInfo, relToRelinfo RelToRelinfo) error {
 	strValues := make([][]string, 0)
-	// Parent With Children
-	strValues = append(strValues, []string{"Parent", "Relation", "Kind",
+	// Table With Children
+	strValues = append(strValues, []string{"Table", "Relation", "Kind",
 		fmt.Sprintf("PageCached (%s)", relation.UnitToString(p.Unit)),
 		fmt.Sprintf("PageCount (%s)", relation.UnitToString(p.Unit)),
 		"%Cached", "%Total"})
-	for i, parent := range relinfos {
+	for i, table := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			break
 		}
 
-		children := p.fetchChildren(&parent, relToRelinfo)
+		children := p.fetchChildren(&table, relToRelinfo)
 		if len(children) > 1 {
-			// Only show parent when it has multiple children
-			parentRelinfo := relation.RelInfo{Relname: "-", Relkind: '-', PcStats: parent.PcStats}
-			strValues = append(strValues, parentRelinfo.ToStringArrayParent(parent.Relname, p.Unit, p.page_size, p.cached_memory))
+			// Only show table when it has multiple children
+			parentRelinfo := relation.RelInfo{Relname: "-", Relkind: '-', PcStats: table.PcStats}
+			strValues = append(strValues, parentRelinfo.ToStringArrayParent(table.Relname, p.Unit, p.page_size, p.cached_memory))
 		}
 
+		if p.Aggregation == AggTableOnly {
+			// Skip printing children
+			continue
+		}
 		p.sortRelInfos(children)
 		for _, child := range children {
-			strValues = append(strValues, child.ToStringArrayParent(parent.Relname, p.Unit, p.page_size, p.cached_memory))
+			strValues = append(strValues, child.ToStringArrayParent(table.Relname, p.Unit, p.page_size, p.cached_memory))
 		}
 	}
 	return p.outputValues(strValues)

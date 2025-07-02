@@ -27,8 +27,10 @@ const (
 	SortPageCount
 
 	AggNone FormatAggregation = iota
-	AggOnlyParent
-	AggParentWithChildren
+	AggTable
+	AggTableOnly
+	AggPartition
+	AggPartitionOnly
 
 	FormatCSV = iota
 	FormatColumn
@@ -43,9 +45,11 @@ var (
 	}
 
 	formatAggregationMap = map[string]FormatAggregation{
-		"none":                 AggNone,
-		"parent_only":          AggOnlyParent,
-		"parent_with_children": AggParentWithChildren,
+		"none":           AggNone,
+		"table":          AggTable,
+		"table_only":     AggTableOnly,
+		"partition":      AggPartition,
+		"partition_only": AggPartitionOnly,
 	}
 
 	formatUnitMap = map[string]relation.FormatUnit{
@@ -74,7 +78,7 @@ func init() {
 	flag.StringVar(&typeFlag, "format", "column", "Output format to use. Can be csv, column or json")
 	flag.StringVar(&unitFlag, "unit", "page", "Unit to use for paeg count and page cached. Can be page, kb or MB")
 	flag.StringVar(&sortFlag, "sort", "pagecached", "Field to use for sort. Can be relation, pagecount or pagecached")
-	flag.StringVar(&aggregationFlag, "aggregation", "none", "How to aggregate results. relation, parent_only, parent_with_children")
+	flag.StringVar(&aggregationFlag, "aggregation", "none", "How to aggregate results. relation, table, table_only")
 }
 
 func parseSort(s string) (FormatSort, error) {

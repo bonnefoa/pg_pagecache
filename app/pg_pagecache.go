@@ -113,7 +113,8 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	slog.Info("Fetched database details", "database", p.database, "dbid", p.dbid)
 
 	// Fill the file -> relinfo map
-	p.fileToRelinfo, err = relation.GetFileToRelinfo(ctx, p.conn, p.Relations, p.PageThreshold)
+	groupPartition := p.Aggregation == AggPartition || p.Aggregation == AggPartitionOnly
+	p.fileToRelinfo, err = relation.GetFileToRelinfo(ctx, p.conn, p.Relations, p.PageThreshold, groupPartition)
 	if err != nil {
 		err = fmt.Errorf("Error getting file to relation mapping: %v\n", err)
 		return

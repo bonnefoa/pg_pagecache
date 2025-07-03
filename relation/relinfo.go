@@ -12,6 +12,8 @@ type RelInfo struct {
 	Relkind     rune
 	PcStats     pcstats.PcStats
 	Children    []string
+	Partitions  []string
+	IsPartition bool
 }
 
 const (
@@ -63,8 +65,16 @@ func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory 
 		r.PcStats.GetTotalCachedPct(cached_memory)}
 }
 
-func (r *RelInfo) ToStringArrayParent(parent string, unit FormatUnit, page_size int64, cached_memory int64) []string {
-	return []string{parent, r.Relname, KindToString(r.Relkind),
+func (r *RelInfo) ToStringArrayTable(table string, unit FormatUnit, page_size int64, cached_memory int64) []string {
+	return []string{table, r.Relname, KindToString(r.Relkind),
+		formatValue(r.PcStats.PageCached, unit, page_size),
+		formatValue(r.PcStats.PageCount, unit, page_size),
+		r.PcStats.GetCachedPct(),
+		r.PcStats.GetTotalCachedPct(cached_memory)}
+}
+
+func (r *RelInfo) ToStringArrayPartition(partition string, table string, unit FormatUnit, page_size int64, cached_memory int64) []string {
+	return []string{partition, table, r.Relname, KindToString(r.Relkind),
 		formatValue(r.PcStats.PageCached, unit, page_size),
 		formatValue(r.PcStats.PageCount, unit, page_size),
 		r.PcStats.GetCachedPct(),

@@ -11,7 +11,7 @@ import (
 )
 
 type TableToRelations map[string][]string
-type TableToPartitions map[string][]string
+type ParentToPartitions map[string][]string
 
 // GetTableToRelations returns the mapping between a table parent and its child
 // Child includes toast table, toast table index and all indexes of the parent relation
@@ -48,7 +48,7 @@ func getTableToRelations(ctx context.Context, conn *pgx.Conn, pageThreshold int)
 	return
 }
 
-func getParentToPartitions(ctx context.Context, conn *pgx.Conn) (tableToPartitions TableToPartitions, err error) {
+func getParentToPartitions(ctx context.Context, conn *pgx.Conn) (parentToPartitions ParentToPartitions, err error) {
 	rows, err := conn.Query(ctx, `SELECT C.relname, array_agg(child.relname)
 		FROM pg_class C
 		JOIN pg_inherits inh ON inh.inhparent = C.oid
@@ -61,7 +61,7 @@ func getParentToPartitions(ctx context.Context, conn *pgx.Conn) (tableToPartitio
 		return
 	}
 
-	tableToPartitions = make(TableToPartitions, 0)
+	parentToPartitions = make(ParentToPartitions, 0)
 	for rows.Next() {
 		var table string
 		var partitions []string
@@ -69,26 +69,37 @@ func getParentToPartitions(ctx context.Context, conn *pgx.Conn) (tableToPartitio
 		if err != nil {
 			return nil, fmt.Errorf("Error getting table to partitions from pg_class: %v", err)
 		}
-		tableToPartitions[table] = partitions
+		parentToPartitions[table] = partitions
 	}
 	return
 }
 
 // GetFileToRelinfo returns the mapping between relfilenode and the relation
-func GetFileToRelinfo(ctx context.Context, conn *pgx.Conn, relations []string, pageThreshold int) (fileToRelinfo FileToRelinfo, err error) {
+func GetFileToRelinfo(ctx context.Context, conn *pgx.Conn, relations []string, pageThreshold int, groupPartitions bool) (fileToRelinfo FileToRelinfo, err error) {
+	var parentToPartitions ParentToPartitions
 	tableToRelations, err := getTableToRelations(ctx, conn, pageThreshold)
 	if err != nil {
 		return
 	}
+	if groupPartitions {
+		parentToPartitions, err = getParentToPartitions(ctx, conn)
+		if err != nil {
+			return
+		}
+	} else {
+		parentToPartitions = make(ParentToPartitions, 0)
+	}
 
 	var rows pgx.Rows
 	if len(relations) > 0 {
-		rows, err = conn.Query(ctx, `SELECT C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
+		rows, err = conn.Query(ctx, `SELECT C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid), inh.inhrelid IS NOT NULL
 FROM pg_class C
+LEFT JOIN pg_inherits inh ON inh.inhrelid = C.oid
 WHERE relname=ANY($1) AND relpages > $2 AND relkind = ANY('{r,i,t,m,p,I}')`, pq.Array(relations), pageThreshold)
 	} else {
-		rows, err = conn.Query(ctx, `SELECT C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
+		rows, err = conn.Query(ctx, `SELECT C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid), inh.inhrelid IS NOT NULL
 FROM pg_class C
+LEFT JOIN pg_inherits inh ON inh.inhrelid = C.oid
 WHERE relpages > $1 AND relkind = ANY('{r,i,t,m,p,I}')`, pageThreshold)
 	}
 	if err != nil {
@@ -101,14 +112,16 @@ WHERE relpages > $1 AND relkind = ANY('{r,i,t,m,p,I}')`, pageThreshold)
 		var relname string
 		var relkind rune
 		var relfilenode uint32
-		err = rows.Scan(&relname, &relkind, &relfilenode)
+		var IsPartition bool
+		err = rows.Scan(&relname, &relkind, &relfilenode, IsPartition)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting list of relfilenode from pg_class: %v\n", err)
 			return
 		}
 
 		children := tableToRelations[relname]
-		fileToRelinfo[relfilenode] = RelInfo{relfilenode, relname, relkind, pcstats.PcStats{}, children}
+		partitions := parentToPartitions[relname]
+		fileToRelinfo[relfilenode] = RelInfo{relfilenode, relname, relkind, pcstats.PcStats{}, children, partitions, IsPartition}
 	}
 
 	return

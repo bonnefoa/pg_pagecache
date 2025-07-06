@@ -10,17 +10,26 @@ import (
 )
 
 type TableToRelinfos map[TableInfo][]*RelInfo
+type PartitionToTables map[PartInfo]TableToRelinfos
 
-// GetTableToRelinfo returns the mapping between a table parent and its child
+// GetPartitionToTables returns the mapping between a parent partition and its children
 // Child includes toast table, toast table index and all indexes of the parent relation
-func GetTableToRelinfo(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (tableToRelinfos TableToRelinfos, err error) {
-	rows, err := conn.Query(ctx, `SELECT COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
+func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (partitionToTables PartitionToTables, err error) {
+	rows, err := conn.Query(ctx, `SELECT COALESCE(parent_idx.relname, parent.relname, 'None'), COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 		FROM pg_class C
 		LEFT JOIN pg_index ON pg_index.indexrelid = C.oid
 		-- index to parent table
 		LEFT JOIN pg_class PI ON pg_index.indrelid = PI.oid AND PI.relkind='r'
 		-- toast to parent table
 		LEFT JOIN pg_class PT ON C.oid = PT.reltoastrelid
+
+    -- Parent partition
+    LEFT JOIN pg_inherits inh ON inh.inhrelid = C.oid
+    LEFT JOIN pg_class parent ON inh.inhparent = parent.oid
+
+    -- Parent partition from indexes
+    LEFT JOIN pg_inherits inh_idx ON inh_idx.inhrelid = PI.oid
+    LEFT JOIN pg_class parent_idx ON inh_idx.inhparent = parent_idx.oid
 
 		-- toast index to toast table
 		LEFT JOIN pg_class PTI ON pg_index.indrelid = PTI.oid AND PTI.relkind='t'
@@ -33,15 +42,21 @@ func GetTableToRelinfo(ctx context.Context, conn *pgx.Conn, tables []string, pag
 		return
 	}
 
-	tableToRelinfos = make(TableToRelinfos, 0)
+	partitionToTables = make(PartitionToTables, 0)
 	for rows.Next() {
+		var partInfo PartInfo
 		var tableInfo TableInfo
 		var relinfo RelInfo
-		err = rows.Scan(&tableInfo.Name, &relinfo.Relname, &relinfo.Relkind, &relinfo.Relfilenode)
+		err = rows.Scan(&partInfo.Name, &tableInfo.Name, &relinfo.Name, &relinfo.Relkind, &relinfo.Relfilenode)
 		if err != nil {
 			return nil, fmt.Errorf("Error getting table to relation from pg_class: %v", err)
 		}
+		tableToRelinfos, ok := partitionToTables[partInfo]
+		if !ok {
+			tableToRelinfos = make(TableToRelinfos, 0)
+		}
 		tableToRelinfos[tableInfo] = append(tableToRelinfos[tableInfo], &relinfo)
+		partitionToTables[partInfo] = tableToRelinfos
 	}
 	return
 }

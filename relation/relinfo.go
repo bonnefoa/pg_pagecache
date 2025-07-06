@@ -6,16 +6,23 @@ import (
 	"github.com/bonnefoa/pg_pagecache/pcstats"
 )
 
-type TableInfo struct {
+type BaseInfo struct {
 	Name    string
 	PcStats pcstats.PcStats
 }
 
+type TableInfo struct {
+	BaseInfo
+}
+
+type PartInfo struct {
+	BaseInfo
+}
+
 type RelInfo struct {
+	BaseInfo
 	Relfilenode uint32
-	Relname     string
 	Relkind     rune
-	PcStats     pcstats.PcStats
 }
 
 const (
@@ -60,7 +67,7 @@ func formatValue(value int, unit FormatUnit, page_size int64) string {
 }
 
 func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
-	return []string{r.Relname, KindToString(r.Relkind),
+	return []string{r.Name, KindToString(r.Relkind),
 		formatValue(r.PcStats.PageCached, unit, page_size),
 		formatValue(r.PcStats.PageCount, unit, page_size),
 		r.PcStats.GetCachedPct(),
@@ -68,7 +75,15 @@ func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory 
 }
 
 func (r *RelInfo) ToStringArrayParent(parent string, unit FormatUnit, page_size int64, cached_memory int64) []string {
-	return []string{parent, r.Relname, KindToString(r.Relkind),
+	return []string{parent, "", r.Name, KindToString(r.Relkind),
+		formatValue(r.PcStats.PageCached, unit, page_size),
+		formatValue(r.PcStats.PageCount, unit, page_size),
+		r.PcStats.GetCachedPct(),
+		r.PcStats.GetTotalCachedPct(cached_memory)}
+}
+
+func (r *RelInfo) ToStringArrayPartition(partition string, unit FormatUnit, page_size int64, cached_memory int64) []string {
+	return []string{partition, "", r.Name, KindToString(r.Relkind),
 		formatValue(r.PcStats.PageCached, unit, page_size),
 		formatValue(r.PcStats.PageCount, unit, page_size),
 		r.PcStats.GetCachedPct(),
@@ -77,6 +92,14 @@ func (r *RelInfo) ToStringArrayParent(parent string, unit FormatUnit, page_size 
 
 func (t *TableInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
 	return []string{t.Name, "", "",
+		formatValue(t.PcStats.PageCached, unit, page_size),
+		formatValue(t.PcStats.PageCount, unit, page_size),
+		t.PcStats.GetCachedPct(),
+		t.PcStats.GetTotalCachedPct(cached_memory)}
+}
+
+func (t *PartInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
+	return []string{t.Name, "", "", "",
 		formatValue(t.PcStats.PageCached, unit, page_size),
 		formatValue(t.PcStats.PageCount, unit, page_size),
 		t.PcStats.GetCachedPct(),

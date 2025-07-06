@@ -12,6 +12,19 @@ import (
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
+func (p *PgPagecache) sortPartInfos(r []relation.PartInfo) {
+	sort.Slice(r, func(i, j int) bool {
+		switch p.Sort {
+		case SortName:
+			return r[i].Name > r[j].Name
+		case SortPageCached:
+			return r[i].PcStats.PageCached > r[j].PcStats.PageCached
+		default:
+			return r[i].PcStats.PageCount > r[j].PcStats.PageCount
+		}
+	})
+}
+
 func (p *PgPagecache) sortTableInfos(r []relation.TableInfo) {
 	sort.Slice(r, func(i, j int) bool {
 		switch p.Sort {
@@ -29,7 +42,7 @@ func (p *PgPagecache) sortRelInfos(r []*relation.RelInfo) {
 	sort.Slice(r, func(i, j int) bool {
 		switch p.Sort {
 		case SortName:
-			return r[i].Relname > r[j].Relname
+			return r[i].Name > r[j].Name
 		case SortPageCached:
 			return r[i].PcStats.PageCached > r[j].PcStats.PageCached
 		default:
@@ -74,7 +87,7 @@ func (p *PgPagecache) outputValues(valuesWithHeader [][]string) error {
 
 // outputRelinfos prints one line per relation
 func (p *PgPagecache) outputRelinfos(relinfos []*relation.RelInfo) error {
-	total := relation.RelInfo{Relname: "Total", Relkind: 'T'}
+	total := relation.RelInfo{BaseInfo: relation.BaseInfo{Name: "Total"}, Relkind: 'T'}
 	strValues := make([][]string, 0)
 	strValues = append(strValues, []string{"Relation", "Kind",
 		fmt.Sprintf("PageCached (%s)", relation.UnitToString(p.Unit)),
@@ -94,8 +107,10 @@ func (p *PgPagecache) outputRelinfos(relinfos []*relation.RelInfo) error {
 func (p *PgPagecache) formatNoAggregation() error {
 	// No aggregation
 	var relinfos []*relation.RelInfo
-	for _, r := range p.tableToRelinfos {
-		relinfos = append(relinfos, r...)
+	for _, tables := range p.partitionToTables {
+		for _, r := range tables {
+			relinfos = append(relinfos, r...)
+		}
 	}
 	p.sortRelInfos(relinfos)
 	return p.outputRelinfos(relinfos)

@@ -6,12 +6,16 @@ import (
 	"github.com/bonnefoa/pg_pagecache/pcstats"
 )
 
+type TableInfo struct {
+	Name    string
+	PcStats pcstats.PcStats
+}
+
 type RelInfo struct {
 	Relfilenode uint32
 	Relname     string
 	Relkind     rune
 	PcStats     pcstats.PcStats
-	Children    []string
 }
 
 const (
@@ -69,4 +73,12 @@ func (r *RelInfo) ToStringArrayParent(parent string, unit FormatUnit, page_size 
 		formatValue(r.PcStats.PageCount, unit, page_size),
 		r.PcStats.GetCachedPct(),
 		r.PcStats.GetTotalCachedPct(cached_memory)}
+}
+
+func (t *TableInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
+	return []string{t.Name, "", "",
+		formatValue(t.PcStats.PageCached, unit, page_size),
+		formatValue(t.PcStats.PageCount, unit, page_size),
+		t.PcStats.GetCachedPct(),
+		t.PcStats.GetTotalCachedPct(cached_memory)}
 }

@@ -22,7 +22,7 @@ type FormatOptions struct {
 }
 
 const (
-	SortRelation FormatSort = iota
+	SortName FormatSort = iota
 	SortPageCached
 	SortPageCount
 
@@ -39,7 +39,7 @@ const (
 
 var (
 	formatSortMap = map[string]FormatSort{
-		"relation":   SortRelation,
+		"name":       SortName,
 		"pagecached": SortPageCached,
 		"pagecount":  SortPageCount,
 	}

@@ -8,8 +8,6 @@ import (
 
 	"syscall"
 
-	"log/slog"
-
 	"golang.org/x/sys/unix"
 )
 
@@ -101,6 +99,5 @@ func GetPcStats(fullPath string, pagesize int64) (PcStats, error) {
 	if err != nil {
 		return pcStats, fmt.Errorf("Getting pagecache stats for %s failed: %v", fullPath, err)
 	}
-	slog.Debug("Fetched pgstats", "fullpath", fullPath, "pagecount", pcStats.PageCount, "pagecached", pcStats.PageCached)
 	return pcStats, nil
 }

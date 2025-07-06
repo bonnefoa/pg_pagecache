@@ -2,11 +2,10 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"log/slog"
 
@@ -20,79 +19,63 @@ type PgPagecache struct {
 	CliArgs
 	conn *pgx.Conn
 
-	dbid          uint32
-	database      string
-	page_size     int64
-	cached_memory int64
-	fileToRelinfo relation.FileToRelinfo
+	dbid            uint32
+	database        string
+	page_size       int64
+	cached_memory   int64
+	tableToRelinfos relation.TableToRelinfos
 }
 
-func extractRelfilenode(filename string) (relfilenode uint32, err error) {
-	// Remove possible segment number
-	relid := strings.Split(filename, ".")[0]
-	relfilenodeUint64, err := strconv.ParseUint(relid, 10, 32)
-	relfilenode = uint32(relfilenodeUint64)
-	if err != nil {
-		return
-	}
-	if relfilenode == 0 {
-		slog.Debug("Not a relation file, ignoring", "filename", filename)
-		return
-	}
-	return
-}
-
-// fillPcStats iterate over fileToRelinfo and fetch page cache stats
-func (p *PgPagecache) fillPcStats() error {
+func (p *PgPagecache) fillRelinfoPcStats(relinfo *relation.RelInfo) (err error) {
 	baseDir := fmt.Sprintf("%s/base/%d", p.PgData, p.dbid)
-	entries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return fmt.Errorf("Error listing file: %v", err)
-	}
+	segno := 0
 
-	num_entries := len(entries)
-	slog.Info("Listed relation files", "num_files", num_entries)
-	for k, entrie := range entries {
-		filename := entrie.Name()
-
-		if strings.Contains(filename, "_") {
-			// Ignore FSM and VM forks
-			continue
+	for {
+		filename := fmt.Sprintf("%d", relinfo.Relfilenode)
+		if segno > 0 {
+			filename = fmt.Sprintf("%d.%d", relinfo.Relfilenode, segno)
 		}
-
-		relfilenode, err := extractRelfilenode(filename)
-		if err != nil {
-			return err
-		}
-		if relfilenode == 0 {
-			continue
-		}
-
-		// Get the matching relinfo
-		relinfo, ok := p.fileToRelinfo[relfilenode]
-		if !ok {
-			// relfilenode was filtered out, skip it
-			continue
-		}
-
+		segno++
 		fullPath := filepath.Join(baseDir, filename)
-		pcStats, err := pcstats.GetPcStats(fullPath, p.page_size)
+		_, err = os.Stat(fullPath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				// Last segment was processed, exit
+				return nil
+			}
+			return
+		}
+
+		relinfo.PcStats, err = pcstats.GetPcStats(fullPath, p.page_size)
 		if err != nil {
 			return err
 		}
-		if pcStats.PageCount == 0 {
-			// No page at all, skip it
-			continue
-		}
-		if k%1000 == 0 {
-			slog.Info("Getting pagestats", "current_entry", k, "num_entries", num_entries)
+	}
+}
+
+// fillTablesPcStats iterate over tableToRelinfos and fetch page cache stats
+func (p *PgPagecache) fillTablesPcStats() error {
+	newTableToRelinfos := make(relation.TableToRelinfos, 0)
+
+	for t, relinfos := range p.tableToRelinfos {
+		var filteredRelinfo []*relation.RelInfo
+
+		for _, relinfo := range relinfos {
+			err := p.fillRelinfoPcStats(relinfo)
+			if err != nil {
+				return err
+			}
+			if relinfo.PcStats.PageCached >= p.CachedPageThreshold {
+				filteredRelinfo = append(filteredRelinfo, relinfo)
+			}
+			t.PcStats.Add(relinfo.PcStats)
 		}
 
-		relinfo.PcStats.Add(pcStats)
-		p.fileToRelinfo[relfilenode] = relinfo
-		slog.Debug("Adding relinfo", "Relation", relinfo.Relname, "filename", filename, "pagecached", pcStats.PageCached)
+		newTableToRelinfos[t] = filteredRelinfo
 	}
+
 	slog.Info("Pagestats finished")
+	p.tableToRelinfos = newTableToRelinfos
 	return nil
 }
 
@@ -112,20 +95,20 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	}
 	slog.Info("Fetched database details", "database", p.database, "dbid", p.dbid)
 
-	// Fill the file -> relinfo map
-	p.fileToRelinfo, err = relation.GetFileToRelinfo(ctx, p.conn, p.Relations, p.PageThreshold)
+	// Fill the table -> Relinfos map
+	p.tableToRelinfos, err = relation.GetTableToRelinfo(ctx, p.conn, p.Relations, p.PageThreshold)
 	if err != nil {
-		err = fmt.Errorf("Error getting file to relation mapping: %v\n", err)
+		err = fmt.Errorf("Error getting table to relinfos mapping: %v\n", err)
 		return
 	}
-	slog.Info("Found relations matching page threshold", "numbers", len(p.fileToRelinfo), "page_threshold", p.PageThreshold)
+	slog.Info("Found relations matching page threshold", "numbers", len(p.tableToRelinfos), "page_threshold", p.PageThreshold)
 
 	// Detect page size
 	p.page_size = pcstats.GetPageSize()
 	slog.Info("Detected Page size", "page_size", p.page_size)
 
-	// Go through all known file and fill their PcStats
-	err = p.fillPcStats()
+	// Go through all tables and fill their PcStats
+	err = p.fillTablesPcStats()
 	if err != nil {
 		return
 	}
@@ -138,9 +121,12 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	}
 
 	// Filter out relations under the cached threshold
-	for k, v := range p.fileToRelinfo {
-		if v.PcStats.PageCached <= p.CachedPageThreshold {
-			delete(p.fileToRelinfo, k)
+	for k, relinfos := range p.tableToRelinfos {
+		for _, relinfo := range relinfos {
+			if relinfo.PcStats.PageCached <= p.CachedPageThreshold {
+				delete(p.tableToRelinfos, k)
+			}
+
 		}
 	}
 

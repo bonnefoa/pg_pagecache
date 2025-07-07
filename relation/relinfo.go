@@ -12,9 +12,9 @@ type OutputInfo interface {
 }
 
 type BaseInfo struct {
-	Name    string
-	PcStats pcstats.PcStats
-	Kind    rune
+	Name string
+	pcstats.PageCacheInfo
+	Kind rune
 }
 
 type PartInfo struct {
@@ -80,32 +80,32 @@ func formatValue(value int, unit FormatUnit, page_size int64) (valueStr string) 
 
 func (r *BaseInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
 	return []string{"", "", r.Name, kindToString(r.Kind), "",
-		formatValue(r.PcStats.PageCached, unit, page_size),
-		formatValue(r.PcStats.PageCount, unit, page_size),
-		r.PcStats.GetCachedPct(),
-		r.PcStats.GetTotalCachedPct(file_memory)}
+		formatValue(r.PageCached, unit, page_size),
+		formatValue(r.PageCount, unit, page_size),
+		r.GetCachedPct(),
+		r.GetTotalCachedPct(file_memory)}
 }
 
 func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
 	return []string{r.Partition, r.Table, r.Name, kindToString(r.Kind), fmt.Sprintf("%d", r.Relfilenode),
-		formatValue(r.PcStats.PageCached, unit, page_size),
-		formatValue(r.PcStats.PageCount, unit, page_size),
-		r.PcStats.GetCachedPct(),
-		r.PcStats.GetTotalCachedPct(file_memory)}
+		formatValue(r.PageCached, unit, page_size),
+		formatValue(r.PageCount, unit, page_size),
+		r.GetCachedPct(),
+		r.GetTotalCachedPct(file_memory)}
 }
 
 func (t *TableInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
 	return []string{t.Partition, t.Name, "", kindToString(t.Kind), "",
-		formatValue(t.PcStats.PageCached, unit, page_size),
-		formatValue(t.PcStats.PageCount, unit, page_size),
-		t.PcStats.GetCachedPct(),
-		t.PcStats.GetTotalCachedPct(file_memory)}
+		formatValue(t.PageCached, unit, page_size),
+		formatValue(t.PageCount, unit, page_size),
+		t.GetCachedPct(),
+		t.GetTotalCachedPct(file_memory)}
 }
 
 func (p *PartInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
 	return []string{p.Name, "", "", kindToString(p.Kind), "",
-		formatValue(p.PcStats.PageCached, unit, page_size),
-		formatValue(p.PcStats.PageCount, unit, page_size),
-		p.PcStats.GetCachedPct(),
-		p.PcStats.GetTotalCachedPct(file_memory)}
+		formatValue(p.PageCached, unit, page_size),
+		formatValue(p.PageCount, unit, page_size),
+		p.GetCachedPct(),
+		p.GetTotalCachedPct(file_memory)}
 }

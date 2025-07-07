@@ -11,9 +11,9 @@ func (p *PgPagecache) sortPartInfos(r []relation.PartInfo) {
 	slices.SortFunc(r, func(a, b relation.PartInfo) int {
 		switch p.Sort {
 		case SortPageCount:
-			return cmp.Or(cmp.Compare(b.PcStats.PageCount, a.PcStats.PageCount), cmp.Compare(a.Name, b.Name))
+			return cmp.Or(cmp.Compare(b.PageCount, a.PageCount), cmp.Compare(a.Name, b.Name))
 		case SortPageCached:
-			return cmp.Or(cmp.Compare(b.PcStats.PageCached, a.PcStats.PageCached), cmp.Compare(a.Name, b.Name))
+			return cmp.Or(cmp.Compare(b.PageCached, a.PageCached), cmp.Compare(a.Name, b.Name))
 		}
 		return cmp.Compare(a.Name, b.Name)
 	})
@@ -23,9 +23,9 @@ func (p *PgPagecache) sortTableInfos(r []relation.TableInfo) {
 	slices.SortFunc(r, func(a, b relation.TableInfo) int {
 		switch p.Sort {
 		case SortPageCount:
-			return cmp.Or(cmp.Compare(b.PcStats.PageCount, a.PcStats.PageCount), cmp.Compare(a.Name, b.Name))
+			return cmp.Or(cmp.Compare(b.PageCount, a.PageCount), cmp.Compare(a.Name, b.Name))
 		case SortPageCached:
-			return cmp.Or(cmp.Compare(b.PcStats.PageCached, a.PcStats.PageCached), cmp.Compare(a.Name, b.Name))
+			return cmp.Or(cmp.Compare(b.PageCached, a.PageCached), cmp.Compare(a.Name, b.Name))
 		}
 		return cmp.Compare(a.Name, b.Name)
 	})
@@ -35,9 +35,9 @@ func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
 	slices.SortFunc(r, func(a, b relation.RelInfo) int {
 		switch p.Sort {
 		case SortPageCount:
-			return cmp.Or(cmp.Compare(b.PcStats.PageCount, a.PcStats.PageCount), cmp.Compare(a.Name, b.Name))
+			return cmp.Or(cmp.Compare(b.PageCount, a.PageCount), cmp.Compare(a.Name, b.Name))
 		case SortPageCached:
-			return cmp.Or(cmp.Compare(b.PcStats.PageCached, a.PcStats.PageCached), cmp.Compare(a.Name, b.Name))
+			return cmp.Or(cmp.Compare(b.PageCached, a.PageCached), cmp.Compare(a.Name, b.Name))
 		}
 		return cmp.Compare(a.Name, b.Name)
 	})
@@ -58,7 +58,7 @@ func (p *PgPagecache) formatNoAggregation() (outputInfos []relation.OutputInfo, 
 			break
 		}
 		outputInfos = append(outputInfos, &relinfo)
-		total.PcStats.Add(relinfo.PcStats)
+		total.Add(relinfo.PageCacheInfo)
 	}
 	outputInfos = append(outputInfos, &total)
 	return

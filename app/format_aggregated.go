@@ -26,7 +26,7 @@ func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInf
 		i++
 
 		outputInfos = append(outputInfos, &tableInfo)
-		total.PcStats.Add(tableInfo.PcStats)
+		total.Add(tableInfo.PageCacheInfo)
 
 		if p.Aggregation == AggTableOnly {
 			// Skip printing children
@@ -57,7 +57,7 @@ func (p *PgPagecache) formatAggregatePartitions() (outputInfos []relation.Output
 		i++
 
 		outputInfos = append(outputInfos, &partInfo)
-		total.PcStats.Add(partInfo.PcStats)
+		total.Add(partInfo.PageCacheInfo)
 		if p.Aggregation == AggPartitionOnly {
 			continue
 		}

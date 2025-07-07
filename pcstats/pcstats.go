@@ -2,7 +2,9 @@ package pcstats
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
+	"runtime"
 	"strconv"
 	"unsafe"
 
@@ -11,25 +13,76 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type PcStats struct {
+type PageCacheInfo struct {
 	PageCached int
 	PageCount  int
 }
 
-func (p *PcStats) Add(b PcStats) {
+type PcState struct {
+	pagemapFile *os.File
+}
+
+func (p *PageCacheInfo) Add(b PageCacheInfo) {
 	p.PageCount += b.PageCount
 	p.PageCached += b.PageCached
+}
+
+func (p *PageCacheInfo) GetCachedPct() string {
+	if p.PageCached > 0 {
+		value := 100 * float64(p.PageCached) / float64(p.PageCount)
+		return strconv.FormatFloat(value, 'f', 2, 64)
+	}
+	return "0"
+}
+
+func (p *PageCacheInfo) GetTotalCachedPct(totalCached int64) string {
+	if p.PageCached > 0 && totalCached > 0 {
+		value := 100 * float64(p.PageCached) / float64(totalCached)
+		return strconv.FormatFloat(value, 'f', 2, 64)
+	}
+	return "0"
 }
 
 func GetPageSize() int64 {
 	return int64(os.Getpagesize())
 }
 
-func getPagecacheStats(fd int, size int64, pageSize int64) (PcStats, error) {
+func (p *PcState) getActivePages(mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
+	ret, _, err := syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_RANDOM)
+	if ret != 0 {
+		return fmt.Errorf("syscall MADVISE failed: %v", err)
+	}
+
+	// Populate PTE
+	for i, v := range vec {
+		if v&0x1 > 0 {
+			a := (*byte)(unsafe.Pointer(mmapPtr + uintptr(i)*uintptr(pageSize)))
+			slog.Info("Pointer content", "a", *a)
+		}
+	}
+
+	ret, _, err = syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_SEQUENTIAL)
+	if ret != 0 {
+		return fmt.Errorf("syscall MADVISE failed: %v", err)
+	}
+
+	// One int64 per page
+	buf := make([]byte, len(vec)*8)
+	offset := int64(mmapPtr) / pageSize
+	n, err := p.pagemapFile.ReadAt(buf, offset*8)
+	if n != len(buf) || err != nil {
+		return fmt.Errorf("Error reading pagemap: %v", err)
+	}
+	slog.Info("Read pagemap", "buf", buf, "offset", offset)
+
+	return nil
+}
+
+func (p *PcState) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageCacheInfo, error) {
 	var mmap []byte
-	pcStats := PcStats{}
+	pcStats := PageCacheInfo{}
 	// void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset);
-	mmap, err := unix.Mmap(fd, 0, int(size), unix.PROT_NONE, unix.MAP_SHARED)
+	mmap, err := unix.Mmap(fd, 0, int(fileSize), unix.PROT_NONE, unix.MAP_SHARED)
 	if err != nil {
 		return pcStats, fmt.Errorf("Error while mmaping: %v", err)
 	}
@@ -40,14 +93,14 @@ func getPagecacheStats(fd int, size int64, pageSize int64) (PcStats, error) {
 
 	// Build the result vec. From mincore doc: The vec argument must point to an
 	// array containing at least (length+PAGE_SIZE-1) / PAGE_SIZE bytes
-	vecSize := (size + pageSize - 1) / pageSize
-	vec := make([]byte, vecSize)
+	pageNumber := (fileSize + pageSize - 1) / pageSize
+	vec := make([]byte, pageNumber)
 
 	mmapPtr := uintptr(unsafe.Pointer(&mmap[0]))
-	sizePtr := uintptr(size)
+	fileSizePtr := uintptr(fileSize)
 	vecPtr := uintptr(unsafe.Pointer(&vec[0]))
 
-	ret, _, err := syscall.Syscall(syscall.SYS_MINCORE, mmapPtr, sizePtr, vecPtr)
+	ret, _, err := syscall.Syscall(syscall.SYS_MINCORE, mmapPtr, fileSizePtr, vecPtr)
 	if ret != 0 {
 		return pcStats, fmt.Errorf("syscall SYS_MINCORE failed: %v", err)
 	}
@@ -61,27 +114,24 @@ func getPagecacheStats(fd int, size int64, pageSize int64) (PcStats, error) {
 		}
 	}
 
-	return pcStats, nil
-}
-
-func (p *PcStats) GetCachedPct() string {
-	if p.PageCached > 0 {
-		value := 100 * float64(p.PageCached) / float64(p.PageCount)
-		return strconv.FormatFloat(value, 'f', 2, 64)
+	if runtime.GOOS == "linux" {
+		err = p.getActivePages(mmapPtr, fileSizePtr, vec, pageSize)
 	}
-	return "0"
+
+	return pcStats, err
 }
 
-func (p *PcStats) GetTotalCachedPct(totalCached int64) string {
-	if p.PageCached > 0 && totalCached > 0 {
-		value := 100 * float64(p.PageCached) / float64(totalCached)
-		return strconv.FormatFloat(value, 'f', 2, 64)
+func NewPcState() (pcState PcState, err error) {
+	if runtime.GOOS != "linux" {
+		// Nothing to do
+		return
 	}
-	return "0"
+	pcState.pagemapFile, err = os.Open("/proc/self/pagemap")
+	return
 }
 
-func GetPcStats(fullPath string, pagesize int64) (PcStats, error) {
-	pcStats := PcStats{}
+func (p *PcState) GetPcStats(fullPath string, pagesize int64) (PageCacheInfo, error) {
+	pcStats := PageCacheInfo{}
 	file, err := os.Open(fullPath)
 	if err != nil {
 		return pcStats, fmt.Errorf("Error opening file %s: %v", fullPath, err)
@@ -95,7 +145,7 @@ func GetPcStats(fullPath string, pagesize int64) (PcStats, error) {
 	if fileSize == 0 {
 		return pcStats, nil
 	}
-	pcStats, err = getPagecacheStats(int(file.Fd()), fileInfo.Size(), pagesize)
+	pcStats, err = p.getPagecacheStats(int(file.Fd()), fileInfo.Size(), pagesize)
 	if err != nil {
 		return pcStats, fmt.Errorf("Getting pagecache stats for %s failed: %v", fullPath, err)
 	}

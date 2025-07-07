@@ -43,7 +43,7 @@ func GetCachedMemory(page_size int64) (int64, error) {
 			return 0, err
 		}
 
-		return file_backed_pages / 1024, err
+		return file_backed_pages, err
 	}
 
 	return 0, fmt.Errorf("Cached memory not found")

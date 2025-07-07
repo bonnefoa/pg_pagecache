@@ -23,11 +23,14 @@ type PartInfo struct {
 
 type TableInfo struct {
 	BaseInfo
-	RelInfos []RelInfo
+	Partition string
+	RelInfos  []RelInfo
 }
 
 type RelInfo struct {
 	BaseInfo
+	Partition   string
+	Table       string
 	Relfilenode uint32
 }
 
@@ -82,11 +85,15 @@ func (r *BaseInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory
 }
 
 func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
-	return r.BaseInfo.ToStringArray(unit, page_size, cached_memory)
+	return []string{r.Partition, r.Table, r.Name, kindToString(r.Kind),
+		formatValue(r.PcStats.PageCached, unit, page_size),
+		formatValue(r.PcStats.PageCount, unit, page_size),
+		r.PcStats.GetCachedPct(),
+		r.PcStats.GetTotalCachedPct(cached_memory)}
 }
 
 func (t *TableInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
-	return []string{"", t.Name, "", kindToString(t.Kind),
+	return []string{t.Partition, t.Name, "", kindToString(t.Kind),
 		formatValue(t.PcStats.PageCached, unit, page_size),
 		formatValue(t.PcStats.PageCount, unit, page_size),
 		t.PcStats.GetCachedPct(),

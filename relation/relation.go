@@ -11,9 +11,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// type TableToRelinfos map[TableInfo][]*RelInfo
-// type PartitionToTables map[PartInfo]TableToRelinfos
-
 // GetPartitionToTables returns the mapping between a parent partition and its children
 // Child includes toast table, toast table index and all indexes of the parent relation
 func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (partInfos []PartInfo, err error) {
@@ -65,8 +62,12 @@ func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, 
 		if !ok {
 			// First time seeing table, we just need to copy the table name
 			tableInfo.Name = tableName
+			tableInfo.Partition = partName
 			tableInfo.Kind = 'T'
 		}
+
+		relinfo.Partition = partName
+		relinfo.Table = tableName
 		tableInfo.RelInfos = append(tableInfo.RelInfos, relinfo)
 
 		// And update the maps

@@ -46,10 +46,11 @@ func (p *PgPagecache) fillRelinfoPcStats(relinfo *relation.RelInfo) (err error) 
 			return
 		}
 
-		relinfo.PcStats, err = pcstats.GetPcStats(fullPath, p.page_size)
+		segmentPcStats, err := pcstats.GetPcStats(fullPath, p.page_size)
 		if err != nil {
 			return err
 		}
+		relinfo.PcStats.Add(segmentPcStats)
 	}
 }
 

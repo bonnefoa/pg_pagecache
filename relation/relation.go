@@ -15,7 +15,7 @@ type PartitionToTables map[PartInfo]TableToRelinfos
 // GetPartitionToTables returns the mapping between a parent partition and its children
 // Child includes toast table, toast table index and all indexes of the parent relation
 func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (partitionToTables PartitionToTables, err error) {
-	rows, err := conn.Query(ctx, `SELECT COALESCE(parent_idx.relname, parent.relname, 'None'), COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
+	rows, err := conn.Query(ctx, `SELECT COALESCE(parent_idx.relname, parent.relname, 'No Partition'), COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 		FROM pg_class C
 		LEFT JOIN pg_index ON pg_index.indexrelid = C.oid
 		-- index to parent table
@@ -44,8 +44,8 @@ func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, 
 
 	partitionToTables = make(PartitionToTables, 0)
 	for rows.Next() {
-		var partInfo PartInfo
-		var tableInfo TableInfo
+		partInfo := PartInfo{BaseInfo: BaseInfo{Kind: 'P'}}
+		tableInfo := TableInfo{BaseInfo: BaseInfo{Kind: 'T'}}
 		var relinfo RelInfo
 		err = rows.Scan(&partInfo.Name, &tableInfo.Name, &relinfo.Name, &relinfo.Kind, &relinfo.Relfilenode)
 		if err != nil {
@@ -75,11 +75,13 @@ func kindToString(kind rune) string {
 		return "Partitioned Tabled"
 	case 'I':
 		return "Partitioned Index"
-	// Artificial kind for our total line
-	case 'T':
+	// Artificial kinds for our own types
+	case 'S':
 		return "Total"
-	case '-':
-		return "-"
+	case 'P':
+		return "Partition"
+	case 'T':
+		return "Table"
 	}
 	return "Unkown"
 }

@@ -100,28 +100,22 @@ func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPagecache, e
 	return
 }
 
-func (p *PgPagecache) outputResults() (err error) {
-	var outputInfos []relation.OutputInfo
+func (p *PgPagecache) getOutputInfos() ([]relation.OutputInfo, error) {
 	switch p.Aggregation {
 	case AggNone:
-		outputInfos, err = p.formatNoAggregation()
+		return p.formatNoAggregation()
 
 	case AggPartition:
 		fallthrough
 	case AggPartitionOnly:
-		outputInfos, err = p.formatAggregatePartitions()
+		return p.formatAggregatePartitions()
 
 	case AggTable:
 		fallthrough
 	case AggTableOnly:
-		outputInfos, err = p.formatAggregatedTables()
+		return p.formatAggregatedTables()
 	}
-
-	if err != nil {
-		return err
-	}
-
-	return p.outputValues(outputInfos)
+	panic("Unreachable code")
 }
 
 func (p *PgPagecache) Run(ctx context.Context) (err error) {
@@ -169,5 +163,9 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 		}
 	}
 
-	return p.outputResults()
+	outputInfos, err := p.getOutputInfos()
+	if err != nil {
+		return err
+	}
+	return p.displayResults(outputInfos)
 }

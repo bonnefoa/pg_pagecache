@@ -29,7 +29,7 @@ type RelInfo struct {
 	Relfilenode uint32
 }
 
-var TotalInfo = BaseInfo{Name: "Total", Kind: 'T'}
+var TotalInfo = BaseInfo{Name: "Total", Kind: 'S'}
 
 const (
 	UnitPage FormatUnit = iota

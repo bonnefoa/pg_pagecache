@@ -47,7 +47,7 @@ func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, 
 		var partInfo PartInfo
 		var tableInfo TableInfo
 		var relinfo RelInfo
-		err = rows.Scan(&partInfo.Name, &tableInfo.Name, &relinfo.Name, &relinfo.Relkind, &relinfo.Relfilenode)
+		err = rows.Scan(&partInfo.Name, &tableInfo.Name, &relinfo.Name, &relinfo.Kind, &relinfo.Relfilenode)
 		if err != nil {
 			return nil, fmt.Errorf("Error getting table to relation from pg_class: %v", err)
 		}
@@ -61,7 +61,7 @@ func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, 
 	return
 }
 
-func KindToString(kind rune) string {
+func kindToString(kind rune) string {
 	switch kind {
 	case 'r':
 		return "Relation"
@@ -77,7 +77,7 @@ func KindToString(kind rune) string {
 		return "Partitioned Index"
 	// Artificial kind for our total line
 	case 'T':
-		return ""
+		return "Total"
 	case '-':
 		return "-"
 	}

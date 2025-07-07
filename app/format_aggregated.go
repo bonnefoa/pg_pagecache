@@ -47,7 +47,7 @@ func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInf
 	// Flatten the tableInfos to sort them
 	tableInfos := slices.Collect(maps.Keys(tableToRelinfos))
 	p.sortTableInfos(tableInfos)
-	total := relation.RelInfo{Relkind: 'T'}
+	total := relation.TotalInfo
 
 	for _, tableInfo := range tableInfos {
 		relinfos := tableToRelinfos[tableInfo]
@@ -78,7 +78,7 @@ func (p *PgPagecache) formatAggregatePartitions() (outputInfos []relation.Output
 	partInfos := slices.Collect(maps.Keys(p.partitionToTables))
 	p.sortPartInfos(partInfos)
 
-	total := relation.RelInfo{Relkind: 'T'}
+	total := relation.TotalInfo
 
 	i := 0
 	if p.Aggregation == AggPartitionOnly {

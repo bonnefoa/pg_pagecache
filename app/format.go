@@ -110,7 +110,7 @@ func (p *PgPagecache) formatNoAggregation() (outputInfos []relation.OutputInfo, 
 	}
 	p.sortRelInfos(relinfos)
 
-	total := relation.RelInfo{BaseInfo: relation.BaseInfo{Name: "Total"}, Relkind: 'T'}
+	total := relation.TotalInfo
 	for i, relinfo := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			break

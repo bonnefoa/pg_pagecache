@@ -1,47 +1,45 @@
 package app
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
 func (p *PgPagecache) sortPartInfos(r []relation.PartInfo) {
-	sort.Slice(r, func(i, j int) bool {
+	slices.SortFunc(r, func(a, b relation.PartInfo) int {
 		switch p.Sort {
-		case SortName:
-			return r[i].Name > r[j].Name
+		case SortPageCount:
+			return cmp.Or(cmp.Compare(b.PcStats.PageCount, a.PcStats.PageCount), cmp.Compare(a.Name, b.Name))
 		case SortPageCached:
-			return r[i].PcStats.PageCached > r[j].PcStats.PageCached
-		default:
-			return r[i].PcStats.PageCount > r[j].PcStats.PageCount
+			return cmp.Or(cmp.Compare(b.PcStats.PageCached, a.PcStats.PageCached), cmp.Compare(a.Name, b.Name))
 		}
+		return cmp.Compare(a.Name, b.Name)
 	})
 }
 
 func (p *PgPagecache) sortTableInfos(r []relation.TableInfo) {
-	sort.Slice(r, func(i, j int) bool {
+	slices.SortFunc(r, func(a, b relation.TableInfo) int {
 		switch p.Sort {
-		case SortName:
-			return r[i].Name > r[j].Name
+		case SortPageCount:
+			return cmp.Or(cmp.Compare(b.PcStats.PageCount, a.PcStats.PageCount), cmp.Compare(a.Name, b.Name))
 		case SortPageCached:
-			return r[i].PcStats.PageCached > r[j].PcStats.PageCached
-		default:
-			return r[i].PcStats.PageCount > r[j].PcStats.PageCount
+			return cmp.Or(cmp.Compare(b.PcStats.PageCached, a.PcStats.PageCached), cmp.Compare(a.Name, b.Name))
 		}
+		return cmp.Compare(a.Name, b.Name)
 	})
 }
 
 func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
-	sort.Slice(r, func(i, j int) bool {
+	slices.SortFunc(r, func(a, b relation.RelInfo) int {
 		switch p.Sort {
-		case SortName:
-			return r[i].Name > r[j].Name
+		case SortPageCount:
+			return cmp.Or(cmp.Compare(b.PcStats.PageCount, a.PcStats.PageCount), cmp.Compare(a.Name, b.Name))
 		case SortPageCached:
-			return r[i].PcStats.PageCached > r[j].PcStats.PageCached
-		default:
-			return r[i].PcStats.PageCount > r[j].PcStats.PageCount
+			return cmp.Or(cmp.Compare(b.PcStats.PageCached, a.PcStats.PageCached), cmp.Compare(a.Name, b.Name))
 		}
+		return cmp.Compare(a.Name, b.Name)
 	})
 }
 

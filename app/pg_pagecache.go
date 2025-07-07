@@ -153,13 +153,28 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	}
 
 	// Filter out relations under the cached threshold
-	for _, tables := range p.partitionToTables {
-		for k, relinfos := range tables {
+	for part, tables := range p.partitionToTables {
+		// Filter partitions under the threshold
+		if part.PcStats.PageCached <= p.CachedPageThreshold {
+			delete(p.partitionToTables, part)
+			continue
+		}
+
+		for t, relinfos := range tables {
+			// Filter table under the threshold
+			if t.PcStats.PageCached <= p.CachedPageThreshold {
+				delete(tables, t)
+				continue
+			}
+
+			// Filter relinfos under the threshold
+			var filteredRelinfos []*relation.RelInfo
 			for _, relinfo := range relinfos {
-				if relinfo.PcStats.PageCached <= p.CachedPageThreshold {
-					delete(tables, k)
+				if relinfo.PcStats.PageCached > p.CachedPageThreshold {
+					filteredRelinfos = append(filteredRelinfos, relinfo)
 				}
 			}
+			tables[t] = filteredRelinfos
 		}
 	}
 

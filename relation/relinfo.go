@@ -1,6 +1,7 @@
 package relation
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/bonnefoa/pg_pagecache/pcstats"
@@ -41,14 +42,18 @@ const (
 	UnitKB
 	UnitMB
 	UnitGB
+
+	kebibyte = float64(1 << 10)
+	mebibyte = float64(1 << 20)
+	gebibyte = float64(1 << 30)
 )
 
 type FormatUnit int
 
-func UnitToString(u FormatUnit) string {
+func unitToString(u FormatUnit) string {
 	switch u {
 	case UnitPage:
-		return "Page"
+		return "Pgs"
 	case UnitKB:
 		return "KB"
 	case UnitMB:
@@ -59,21 +64,18 @@ func UnitToString(u FormatUnit) string {
 	return "?"
 }
 
-func formatValue(value int, unit FormatUnit, page_size int64) string {
-	kb := float64(1024)
-	mb := float64(1024 * 1024)
-	gb := float64(1024 * 1024 * 1024)
+func formatValue(value int, unit FormatUnit, page_size int64) (valueStr string) {
 	switch unit {
 	case UnitPage:
-		return strconv.FormatInt(int64(value), 10)
+		valueStr = strconv.FormatInt(int64(value), 10)
 	case UnitKB:
-		return strconv.FormatFloat(float64(int64(value)*page_size)/kb, 'f', -1, 64)
+		valueStr = strconv.FormatFloat(float64(int64(value)*page_size)/kebibyte, 'f', -1, 64)
 	case UnitMB:
-		return strconv.FormatFloat(float64(int64(value)*page_size)/mb, 'f', 2, 64)
+		valueStr = strconv.FormatFloat(float64(int64(value)*page_size)/mebibyte, 'f', 2, 64)
 	case UnitGB:
-		return strconv.FormatFloat(float64(int64(value)*page_size)/gb, 'f', 2, 64)
+		valueStr = strconv.FormatFloat(float64(int64(value)*page_size)/gebibyte, 'f', 2, 64)
 	}
-	panic("Unreachable code")
+	return fmt.Sprintf("%s %s", valueStr, unitToString(unit))
 }
 
 func (r *BaseInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {

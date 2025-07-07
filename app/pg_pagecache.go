@@ -19,11 +19,20 @@ type PgPagecache struct {
 	CliArgs
 	conn *pgx.Conn
 
-	dbid          uint32
-	database      string
-	page_size     int64
-	cached_memory int64
-	partitions    []relation.PartInfo
+	dbid        uint32
+	database    string
+	page_size   int64
+	file_memory int64 // Cache memory without shared_buffers
+	partitions  []relation.PartInfo
+}
+
+// getSharedBuffers returns the amount of shared_buffers memory in 4KB pages
+func (p *PgPagecache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (shared_buffers int, err error) {
+	row := conn.QueryRow(ctx, "SELECT setting::int FROM pg_settings where name='shared_buffers'")
+	err = row.Scan(&shared_buffers)
+
+	// pg_settings uses 8Kb blocks, we want 4KB pages
+	return shared_buffers / 2, err
 }
 
 func (p *PgPagecache) fillRelinfoPcStats(relinfo *relation.RelInfo) (err error) {
@@ -140,12 +149,18 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 		return
 	}
 
-	p.cached_memory, err = meminfo.GetCachedMemory(p.page_size)
+	cached_memory, err := meminfo.GetCachedMemory(p.page_size)
 	if err != nil {
-		slog.Warn("Couldn't get cached_memory", "error", err)
-	} else {
-		slog.Info("Detected cached memory usage", "cached_memory", p.cached_memory)
+		return fmt.Errorf("Couldn't get cached_memory: %v", err)
 	}
+	slog.Info("Detected cached memory usage", "cached_memory", cached_memory)
+
+	shared_buffers, err := p.getSharedBuffers(ctx, p.conn)
+	if err != nil {
+		return fmt.Errorf("Couldn't get shared_buffers: %v", err)
+	}
+	slog.Info("Detected shared_buffers", "shared_buffers", shared_buffers)
+	p.file_memory = cached_memory - int64(shared_buffers)
 
 	// Filter partitions under the threshold
 	var filteredPartInfos []relation.PartInfo

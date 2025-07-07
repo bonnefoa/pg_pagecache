@@ -8,7 +8,7 @@ import (
 )
 
 type OutputInfo interface {
-	ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string
+	ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string
 }
 
 type BaseInfo struct {
@@ -78,34 +78,34 @@ func formatValue(value int, unit FormatUnit, page_size int64) (valueStr string) 
 	return fmt.Sprintf("%s %s", valueStr, unitToString(unit))
 }
 
-func (r *BaseInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
+func (r *BaseInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
 	return []string{"", "", r.Name, kindToString(r.Kind), "",
 		formatValue(r.PcStats.PageCached, unit, page_size),
 		formatValue(r.PcStats.PageCount, unit, page_size),
 		r.PcStats.GetCachedPct(),
-		r.PcStats.GetTotalCachedPct(cached_memory)}
+		r.PcStats.GetTotalCachedPct(file_memory)}
 }
 
-func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
+func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
 	return []string{r.Partition, r.Table, r.Name, kindToString(r.Kind), fmt.Sprintf("%d", r.Relfilenode),
 		formatValue(r.PcStats.PageCached, unit, page_size),
 		formatValue(r.PcStats.PageCount, unit, page_size),
 		r.PcStats.GetCachedPct(),
-		r.PcStats.GetTotalCachedPct(cached_memory)}
+		r.PcStats.GetTotalCachedPct(file_memory)}
 }
 
-func (t *TableInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
+func (t *TableInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
 	return []string{t.Partition, t.Name, "", kindToString(t.Kind), "",
 		formatValue(t.PcStats.PageCached, unit, page_size),
 		formatValue(t.PcStats.PageCount, unit, page_size),
 		t.PcStats.GetCachedPct(),
-		t.PcStats.GetTotalCachedPct(cached_memory)}
+		t.PcStats.GetTotalCachedPct(file_memory)}
 }
 
-func (p *PartInfo) ToStringArray(unit FormatUnit, page_size int64, cached_memory int64) []string {
+func (p *PartInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
 	return []string{p.Name, "", "", kindToString(p.Kind), "",
 		formatValue(p.PcStats.PageCached, unit, page_size),
 		formatValue(p.PcStats.PageCount, unit, page_size),
 		p.PcStats.GetCachedPct(),
-		p.PcStats.GetTotalCachedPct(cached_memory)}
+		p.PcStats.GetTotalCachedPct(file_memory)}
 }

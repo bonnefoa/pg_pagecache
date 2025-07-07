@@ -51,11 +51,27 @@ func (p *PgPagecache) sortRelInfos(r []*relation.RelInfo) {
 	})
 }
 
-func (p *PgPagecache) outputValues(valuesWithHeader [][]string) error {
-	values := valuesWithHeader
-	if p.NoHeader {
-		values = valuesWithHeader[1:]
+func (p *PgPagecache) outputValues(outputInfos []relation.OutputInfo) error {
+	var values [][]string
+
+	header := p.getHeader()
+	if !p.NoHeader {
+		values = append(values, header)
 	}
+
+	for _, v := range outputInfos {
+		line := v.ToStringArray(p.Unit, p.page_size, p.cached_memory)
+		switch p.Aggregation {
+		case AggNone:
+			line = line[2:]
+		case AggTable:
+			fallthrough
+		case AggTableOnly:
+			line = line[1:]
+		}
+		values = append(values, line)
+	}
+
 	switch p.Type {
 	case FormatCSV:
 		w := csv.NewWriter(os.Stdout)
@@ -63,9 +79,9 @@ func (p *PgPagecache) outputValues(valuesWithHeader [][]string) error {
 		return w.Error()
 	case FormatJson:
 		m := make([]map[string]string, 0)
-		for _, line := range valuesWithHeader[1:] {
+		for _, line := range values {
 			o := make(map[string]string, 0)
-			for i, k := range valuesWithHeader[0] {
+			for i, k := range header {
 				o[k] = line[i]
 			}
 			m = append(m, o)
@@ -85,27 +101,7 @@ func (p *PgPagecache) outputValues(valuesWithHeader [][]string) error {
 	return nil
 }
 
-// outputRelinfos prints one line per relation
-func (p *PgPagecache) outputRelinfos(relinfos []*relation.RelInfo) error {
-	total := relation.RelInfo{BaseInfo: relation.BaseInfo{Name: "Total"}, Relkind: 'T'}
-	strValues := make([][]string, 0)
-	strValues = append(strValues, []string{"Relation", "Kind",
-		fmt.Sprintf("PageCached (%s)", relation.UnitToString(p.Unit)),
-		fmt.Sprintf("PageCount (%s)", relation.UnitToString(p.Unit)),
-		"%Cached", "%Total"})
-	for i, relinfo := range relinfos {
-		if p.Limit > 0 && i >= p.Limit {
-			break
-		}
-		strValues = append(strValues, relinfo.ToStringArray(p.Unit, p.page_size, p.cached_memory))
-		total.PcStats.Add(relinfo.PcStats)
-	}
-	strValues = append(strValues, total.ToStringArray(p.Unit, p.page_size, p.cached_memory))
-	return p.outputValues(strValues)
-}
-
-func (p *PgPagecache) formatNoAggregation() error {
-	// No aggregation
+func (p *PgPagecache) formatNoAggregation() (outputInfos []relation.OutputInfo, err error) {
 	var relinfos []*relation.RelInfo
 	for _, tables := range p.partitionToTables {
 		for _, r := range tables {
@@ -113,5 +109,15 @@ func (p *PgPagecache) formatNoAggregation() error {
 		}
 	}
 	p.sortRelInfos(relinfos)
-	return p.outputRelinfos(relinfos)
+
+	total := relation.RelInfo{BaseInfo: relation.BaseInfo{Name: "Total"}, Relkind: 'T'}
+	for i, relinfo := range relinfos {
+		if p.Limit > 0 && i >= p.Limit {
+			break
+		}
+		outputInfos = append(outputInfos, relinfo)
+		total.PcStats.Add(relinfo.PcStats)
+	}
+	outputInfos = append(outputInfos, &total)
+	return
 }

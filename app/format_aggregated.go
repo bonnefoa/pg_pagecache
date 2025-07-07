@@ -10,15 +10,31 @@ import (
 
 type RelToRelinfo map[string]relation.RelInfo
 
-// formatAgggregated prints relations with their children
-func (p *PgPagecache) formatAggregatedTables() error {
-	strValues := make([][]string, 0)
-	// Header with table
-	strValues = append(strValues, []string{"Table", "Relation", "Kind",
-		fmt.Sprintf("PageCached (%s)", relation.UnitToString(p.Unit)),
-		fmt.Sprintf("PageCount (%s)", relation.UnitToString(p.Unit)),
-		"%Cached", "%Total"})
+func (p *PgPagecache) getHeader() []string {
+	var res []string
 
+	switch p.Aggregation {
+	case AggPartition:
+		fallthrough
+	case AggPartitionOnly:
+		res = append(res, "Partition")
+		fallthrough
+	case AggTable:
+		fallthrough
+	case AggTableOnly:
+		res = append(res, "Table")
+	case AggNone: // Nothing to do
+	}
+
+	res = append(res, []string{"Relation", "Kind", fmt.Sprintf("PageCached (%s)",
+		relation.UnitToString(p.Unit)), fmt.Sprintf("PageCount (%s)",
+		relation.UnitToString(p.Unit)), "%Cached", "%Total"}...)
+
+	return res
+}
+
+// formatAgggregated prints relations with their children
+func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInfo, err error) {
 	i := 0
 
 	tableToRelinfos := make(map[relation.TableInfo][]*relation.RelInfo)
@@ -41,7 +57,7 @@ func (p *PgPagecache) formatAggregatedTables() error {
 		}
 		i++
 
-		strValues = append(strValues, tableInfo.ToStringArray(p.Unit, p.page_size, p.cached_memory))
+		outputInfos = append(outputInfos, &tableInfo)
 		total.PcStats.Add(tableInfo.PcStats)
 
 		if p.Aggregation == AggTableOnly {
@@ -50,29 +66,21 @@ func (p *PgPagecache) formatAggregatedTables() error {
 		}
 		p.sortRelInfos(relinfos)
 		for _, child := range relinfos {
-			strValues = append(strValues, child.ToStringArrayParent("", p.Unit, p.page_size, p.cached_memory))
+			outputInfos = append(outputInfos, child)
 		}
 	}
 
-	strValues = append(strValues, total.ToStringArrayParent("Total", p.Unit, p.page_size, p.cached_memory))
-	return p.outputValues(strValues)
+	outputInfos = append(outputInfos, &total)
+	return
 }
 
-func (p *PgPagecache) formatAggregatePartitions() error {
-	strValues := make([][]string, 0)
-	// Header with partitons
-	strValues = append(strValues, []string{"Partition", "Table", "Relation", "Kind",
-		fmt.Sprintf("PageCached (%s)", relation.UnitToString(p.Unit)),
-		fmt.Sprintf("PageCount (%s)", relation.UnitToString(p.Unit)),
-		"%Cached", "%Total"})
-
-	i := 0
-
+func (p *PgPagecache) formatAggregatePartitions() (outputInfos []relation.OutputInfo, err error) {
 	partInfos := slices.Collect(maps.Keys(p.partitionToTables))
 	p.sortPartInfos(partInfos)
 
 	total := relation.RelInfo{Relkind: 'T'}
 
+	i := 0
 	if p.Aggregation == AggPartitionOnly {
 		for _, partInfo := range partInfos {
 			if p.Limit > 0 && i >= p.Limit {
@@ -80,10 +88,11 @@ func (p *PgPagecache) formatAggregatePartitions() error {
 			}
 			i++
 
-			strValues = append(strValues, partInfo.ToStringArray(p.Unit, p.page_size, p.cached_memory))
+			outputInfos = append(outputInfos, &partInfo)
 			total.PcStats.Add(partInfo.PcStats)
 		}
-		strValues = append(strValues, total.ToStringArrayParent("Total", p.Unit, p.page_size, p.cached_memory))
+		outputInfos = append(outputInfos, &total)
+		return
 	}
 
 	// // Flatten the tableInfos to sort them
@@ -113,5 +122,5 @@ func (p *PgPagecache) formatAggregatePartitions() error {
 	//	}
 	//
 	// strValues = append(strValues, total.ToStringArrayParent("Total", p.Unit, p.page_size, p.cached_memory))
-	return p.outputValues(strValues)
+	return
 }

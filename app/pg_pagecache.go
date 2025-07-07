@@ -83,7 +83,7 @@ func (p *PgPagecache) fillTablesPcStats() error {
 			return err
 		}
 
-		for k, _ := range tableToRelinfos {
+		for k := range tableToRelinfos {
 			part.PcStats.Add(k.PcStats)
 		}
 		newPartitionToTables[part] = tableToRelinfos
@@ -98,6 +98,30 @@ func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPagecache, e
 	pgPagecache.conn = conn
 	pgPagecache.CliArgs = cliArgs
 	return
+}
+
+func (p *PgPagecache) outputResults() (err error) {
+	var outputInfos []relation.OutputInfo
+	switch p.Aggregation {
+	case AggNone:
+		outputInfos, err = p.formatNoAggregation()
+
+	case AggPartition:
+		fallthrough
+	case AggPartitionOnly:
+		outputInfos, err = p.formatAggregatePartitions()
+
+	case AggTable:
+		fallthrough
+	case AggTableOnly:
+		outputInfos, err = p.formatAggregatedTables()
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return p.outputValues(outputInfos)
 }
 
 func (p *PgPagecache) Run(ctx context.Context) (err error) {
@@ -145,20 +169,5 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 		}
 	}
 
-	switch p.Aggregation {
-	case AggNone:
-		return p.formatNoAggregation()
-
-	case AggPartition:
-		fallthrough
-	case AggPartitionOnly:
-		return p.formatAggregatePartitions()
-
-	case AggTable:
-		fallthrough
-	case AggTableOnly:
-		return p.formatAggregatedTables()
-	}
-
-	return nil
+	return p.outputResults()
 }

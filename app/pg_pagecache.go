@@ -19,11 +19,11 @@ type PgPagecache struct {
 	CliArgs
 	conn *pgx.Conn
 
-	dbid              uint32
-	database          string
-	page_size         int64
-	cached_memory     int64
-	partitionToTables relation.PartitionToTables
+	dbid          uint32
+	database      string
+	page_size     int64
+	cached_memory int64
+	partitions    []relation.PartInfo
 }
 
 func (p *PgPagecache) fillRelinfoPcStats(relinfo *relation.RelInfo) (err error) {
@@ -53,42 +53,37 @@ func (p *PgPagecache) fillRelinfoPcStats(relinfo *relation.RelInfo) (err error) 
 	}
 }
 
-func (p *PgPagecache) getTablesPcStats(tables relation.TableToRelinfos) (relation.TableToRelinfos, error) {
-	res := make(relation.TableToRelinfos, 0)
-	for t, relinfos := range tables {
-		var filteredRelinfo []*relation.RelInfo
+func (p *PgPagecache) fillTableStats(table *relation.TableInfo) error {
+	var filteredRelinfo []relation.RelInfo
 
-		for _, relinfo := range relinfos {
-			err := p.fillRelinfoPcStats(relinfo)
-			if err != nil {
-				return nil, err
-			}
-			if relinfo.PcStats.PageCached >= p.CachedPageThreshold {
-				filteredRelinfo = append(filteredRelinfo, relinfo)
-			}
-			t.PcStats.Add(relinfo.PcStats)
-		}
-
-		res[t] = filteredRelinfo
-	}
-	return res, nil
-}
-
-// fillTablesPcStats iterate over tableToRelinfos and fetch page cache stats
-func (p *PgPagecache) fillTablesPcStats() error {
-	newPartitionToTables := make(relation.PartitionToTables, 0)
-	for part, tables := range p.partitionToTables {
-		tableToRelinfos, err := p.getTablesPcStats(tables)
+	for _, relinfo := range table.RelInfos {
+		err := p.fillRelinfoPcStats(&relinfo)
 		if err != nil {
 			return err
 		}
-
-		for k := range tableToRelinfos {
-			part.PcStats.Add(k.PcStats)
+		if relinfo.PcStats.PageCached >= p.CachedPageThreshold {
+			filteredRelinfo = append(filteredRelinfo, relinfo)
 		}
-		newPartitionToTables[part] = tableToRelinfos
+		table.PcStats.Add(relinfo.PcStats)
 	}
-	p.partitionToTables = newPartitionToTables
+	table.RelInfos = filteredRelinfo
+
+	return nil
+}
+
+// fillPartitionPcStats iterate over tableToRelinfos and fetch page cache stats
+func (p *PgPagecache) fillPartitionPcStats() error {
+	for partName, partInfo := range p.partitions {
+		for tableName, tableInfo := range partInfo.TableInfos {
+			err := p.fillTableStats(&tableInfo)
+			if err != nil {
+				return err
+			}
+			partInfo.PcStats.Add(tableInfo.PcStats)
+			partInfo.TableInfos[tableName] = tableInfo
+		}
+		p.partitions[partName] = partInfo
+	}
 	slog.Info("Pagestats finished")
 	return nil
 }
@@ -128,19 +123,18 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	slog.Info("Fetched database details", "database", p.database, "dbid", p.dbid)
 
 	// Fill the partition -> []Table map
-	p.partitionToTables, err = relation.GetPartitionToTables(ctx, p.conn, p.Relations, p.PageThreshold)
+	p.partitions, err = relation.GetPartitionToTables(ctx, p.conn, p.Relations, p.PageThreshold)
 	if err != nil {
 		err = fmt.Errorf("Error getting table to relinfos mapping: %v\n", err)
 		return
 	}
-	slog.Info("Found relations matching page threshold", "numbers", len(p.partitionToTables), "page_threshold", p.PageThreshold)
 
 	// Detect page size
 	p.page_size = pcstats.GetPageSize()
 	slog.Info("Detected Page size", "page_size", p.page_size)
 
 	// Go through all tables and fill their PcStats
-	err = p.fillTablesPcStats()
+	err = p.fillPartitionPcStats()
 	if err != nil {
 		return
 	}
@@ -152,29 +146,33 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 		slog.Info("Detected cached memory usage", "cached_memory", p.cached_memory)
 	}
 
-	// Filter out relations under the cached threshold
-	for part, tables := range p.partitionToTables {
-		// Filter partitions under the threshold
-		if part.PcStats.PageCached <= p.CachedPageThreshold {
-			delete(p.partitionToTables, part)
+	// Filter partitions under the threshold
+	var filteredPartInfos []relation.PartInfo
+	for _, partInfo := range p.partitions {
+		if partInfo.PcStats.PageCached > p.CachedPageThreshold {
+			filteredPartInfos = append(filteredPartInfos, partInfo)
 			continue
 		}
+	}
+	p.partitions = filteredPartInfos
 
-		for t, relinfos := range tables {
+	for _, partInfo := range p.partitions {
+		for tableName, tableInfo := range partInfo.TableInfos {
 			// Filter table under the threshold
-			if t.PcStats.PageCached <= p.CachedPageThreshold {
-				delete(tables, t)
+			if tableInfo.PcStats.PageCached <= p.CachedPageThreshold {
+				delete(partInfo.TableInfos, tableName)
 				continue
 			}
 
 			// Filter relinfos under the threshold
-			var filteredRelinfos []*relation.RelInfo
-			for _, relinfo := range relinfos {
+			var filteredRelinfos []relation.RelInfo
+			for _, relinfo := range tableInfo.RelInfos {
 				if relinfo.PcStats.PageCached > p.CachedPageThreshold {
 					filteredRelinfos = append(filteredRelinfos, relinfo)
 				}
 			}
-			tables[t] = filteredRelinfos
+			tableInfo.RelInfos = filteredRelinfos
+			partInfo.TableInfos[tableName] = tableInfo
 		}
 	}
 
@@ -182,5 +180,5 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	return p.displayResults(outputInfos)
+	return p.outputResults(outputInfos)
 }

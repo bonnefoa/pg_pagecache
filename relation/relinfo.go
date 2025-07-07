@@ -16,12 +16,14 @@ type BaseInfo struct {
 	Kind    rune
 }
 
-type TableInfo struct {
-	BaseInfo
-}
-
 type PartInfo struct {
 	BaseInfo
+	TableInfos map[string]TableInfo
+}
+
+type TableInfo struct {
+	BaseInfo
+	RelInfos []RelInfo
 }
 
 type RelInfo struct {
@@ -38,7 +40,6 @@ const (
 	UnitGB
 )
 
-type FileToRelinfo map[uint32]RelInfo
 type FormatUnit int
 
 func UnitToString(u FormatUnit) string {

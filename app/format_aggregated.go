@@ -7,25 +7,19 @@ import (
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
-func (p *PgPagecache) sortTableToRelinfos(t relation.TableToRelinfos) []relation.TableInfo {
-	tableInfos := slices.Collect(maps.Keys(t))
-	p.sortTableInfos(tableInfos)
-	return tableInfos
-}
-
 // formatAgggregated prints relations with their children
 func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInfo, err error) {
 	i := 0
 
-	tableToRelinfos := make(map[relation.TableInfo][]*relation.RelInfo)
+	var tableInfos []relation.TableInfo
 	// We don't care about partitions, flatten TableInfo -> []Relinfo map
-	for _, tableMap := range p.partitionToTables {
-		maps.Copy(tableToRelinfos, tableMap)
+	for _, partInfo := range p.partitions {
+		tableInfos = append(tableInfos, slices.Collect(maps.Values(partInfo.TableInfos))...)
 	}
 	total := relation.TotalInfo
 
-	sortedTableInfos := p.sortTableToRelinfos(tableToRelinfos)
-	for _, tableInfo := range sortedTableInfos {
+	p.sortTableInfos(tableInfos)
+	for _, tableInfo := range tableInfos {
 		if p.Limit > 0 && i >= p.Limit {
 			break
 		}
@@ -40,10 +34,9 @@ func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInf
 		}
 
 		// Add relinfo children
-		relinfos := tableToRelinfos[tableInfo]
-		p.sortRelInfos(relinfos)
-		for _, child := range relinfos {
-			outputInfos = append(outputInfos, child)
+		p.sortRelInfos(tableInfo.RelInfos)
+		for _, relinfo := range tableInfo.RelInfos {
+			outputInfos = append(outputInfos, &relinfo)
 		}
 	}
 
@@ -52,13 +45,12 @@ func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInf
 }
 
 func (p *PgPagecache) formatAggregatePartitions() (outputInfos []relation.OutputInfo, err error) {
-	partInfos := slices.Collect(maps.Keys(p.partitionToTables))
-	p.sortPartInfos(partInfos)
+	p.sortPartInfos(p.partitions)
 
 	total := relation.TotalInfo
 
 	i := 0
-	for _, partInfo := range partInfos {
+	for _, partInfo := range p.partitions {
 		if p.Limit > 0 && i >= p.Limit {
 			break
 		}
@@ -70,16 +62,15 @@ func (p *PgPagecache) formatAggregatePartitions() (outputInfos []relation.Output
 			continue
 		}
 
-		tableToRelinfos := p.partitionToTables[partInfo]
-		sortedTableInfos := p.sortTableToRelinfos(tableToRelinfos)
-		for _, tableInfo := range sortedTableInfos {
+		tableInfos := slices.Collect(maps.Values(partInfo.TableInfos))
+		p.sortTableInfos(tableInfos)
+		for _, tableInfo := range tableInfos {
 			outputInfos = append(outputInfos, &tableInfo)
 
 			// Add relinfo children
-			relinfos := tableToRelinfos[tableInfo]
-			p.sortRelInfos(relinfos)
-			for _, child := range relinfos {
-				outputInfos = append(outputInfos, child)
+			p.sortRelInfos(tableInfo.RelInfos)
+			for _, relInfo := range tableInfo.RelInfos {
+				outputInfos = append(outputInfos, &relInfo)
 			}
 		}
 

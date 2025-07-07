@@ -12,8 +12,8 @@ import (
 )
 
 type PcStats struct {
-	PageCount  int
 	PageCached int
+	PageCount  int
 }
 
 func (p *PcStats) Add(b PcStats) {

@@ -3,18 +3,20 @@ package relation
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
 )
 
-type TableToRelinfos map[TableInfo][]*RelInfo
-type PartitionToTables map[PartInfo]TableToRelinfos
+// type TableToRelinfos map[TableInfo][]*RelInfo
+// type PartitionToTables map[PartInfo]TableToRelinfos
 
 // GetPartitionToTables returns the mapping between a parent partition and its children
 // Child includes toast table, toast table index and all indexes of the parent relation
-func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (partitionToTables PartitionToTables, err error) {
+func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (partInfos []PartInfo, err error) {
 	rows, err := conn.Query(ctx, `SELECT COALESCE(parent_idx.relname, parent.relname, 'No Partition'), COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 		FROM pg_class C
 		LEFT JOIN pg_index ON pg_index.indexrelid = C.oid
@@ -42,22 +44,36 @@ func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, 
 		return
 	}
 
-	partitionToTables = make(PartitionToTables, 0)
+	partitionMap := make(map[string]PartInfo, 0)
 	for rows.Next() {
-		partInfo := PartInfo{BaseInfo: BaseInfo{Kind: 'P'}}
-		tableInfo := TableInfo{BaseInfo: BaseInfo{Kind: 'T'}}
+		var partName string
+		var tableName string
 		var relinfo RelInfo
-		err = rows.Scan(&partInfo.Name, &tableInfo.Name, &relinfo.Name, &relinfo.Kind, &relinfo.Relfilenode)
+		err = rows.Scan(&partName, &tableName, &relinfo.Name, &relinfo.Kind, &relinfo.Relfilenode)
 		if err != nil {
 			return nil, fmt.Errorf("Error getting table to relation from pg_class: %v", err)
 		}
-		tableToRelinfos, ok := partitionToTables[partInfo]
+		partInfo, ok := partitionMap[partName]
 		if !ok {
-			tableToRelinfos = make(TableToRelinfos, 0)
+			// First time, need to initialise partInfo
+			partInfo.Name = partName
+			partInfo.Kind = 'P'
+			partInfo.TableInfos = make(map[string]TableInfo, 0)
 		}
-		tableToRelinfos[tableInfo] = append(tableToRelinfos[tableInfo], &relinfo)
-		partitionToTables[partInfo] = tableToRelinfos
+
+		tableInfo, ok := partInfo.TableInfos[tableName]
+		if !ok {
+			// First time seeing table, we just need to copy the table name
+			tableInfo.Name = tableName
+			tableInfo.Kind = 'T'
+		}
+		tableInfo.RelInfos = append(tableInfo.RelInfos, relinfo)
+
+		// And update the maps
+		partInfo.TableInfos[tableName] = tableInfo
+		partitionMap[partName] = partInfo
 	}
+	partInfos = slices.Collect(maps.Values(partitionMap))
 	return
 }
 

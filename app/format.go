@@ -32,7 +32,7 @@ func (p *PgPagecache) sortTableInfos(r []relation.TableInfo) {
 	})
 }
 
-func (p *PgPagecache) sortRelInfos(r []*relation.RelInfo) {
+func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
 	sort.Slice(r, func(i, j int) bool {
 		switch p.Sort {
 		case SortName:
@@ -46,10 +46,10 @@ func (p *PgPagecache) sortRelInfos(r []*relation.RelInfo) {
 }
 
 func (p *PgPagecache) formatNoAggregation() (outputInfos []relation.OutputInfo, err error) {
-	var relinfos []*relation.RelInfo
-	for _, tables := range p.partitionToTables {
-		for _, r := range tables {
-			relinfos = append(relinfos, r...)
+	var relinfos []relation.RelInfo
+	for _, partInfo := range p.partitions {
+		for _, tableInfo := range partInfo.TableInfos {
+			relinfos = append(relinfos, tableInfo.RelInfos...)
 		}
 	}
 	p.sortRelInfos(relinfos)
@@ -59,7 +59,7 @@ func (p *PgPagecache) formatNoAggregation() (outputInfos []relation.OutputInfo, 
 		if p.Limit > 0 && i >= p.Limit {
 			break
 		}
-		outputInfos = append(outputInfos, relinfo)
+		outputInfos = append(outputInfos, &relinfo)
 		total.PcStats.Add(relinfo.PcStats)
 	}
 	outputInfos = append(outputInfos, &total)

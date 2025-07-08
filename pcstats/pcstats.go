@@ -56,8 +56,7 @@ func (p *PcState) getActivePages(mmapPtr uintptr, fileSizePtr uintptr, vec []byt
 	// Populate PTE
 	for i, v := range vec {
 		if v&0x1 > 0 {
-			a := (*byte)(unsafe.Pointer(mmapPtr + uintptr(i)*uintptr(pageSize)))
-			slog.Info("Pointer content", "a", *a)
+			_ = (*byte)(unsafe.Pointer(mmapPtr + uintptr(i)*uintptr(pageSize)))
 		}
 	}
 
@@ -73,7 +72,18 @@ func (p *PcState) getActivePages(mmapPtr uintptr, fileSizePtr uintptr, vec []byt
 	if n != len(buf) || err != nil {
 		return fmt.Errorf("Error reading pagemap: %v", err)
 	}
-	slog.Info("Read pagemap", "buf", buf, "offset", offset)
+
+	const i64Size = int(unsafe.Sizeof(int64(0)))
+	i64Ptr := (*int64)(unsafe.Pointer(unsafe.SliceData(buf)))
+	i64Len := len(buf) / i64Size
+	i64 := unsafe.Slice(i64Ptr, i64Len)
+
+	slog.Info("buf", "buf", buf)
+	for i, v := range vec {
+		if v&0x1 > 0 {
+			slog.Info("I64 value", "offset", offset, "i", i, "i64", i64[i])
+		}
+	}
 
 	return nil
 }
@@ -82,7 +92,7 @@ func (p *PcState) getPagecacheStats(fd int, fileSize int64, pageSize int64) (Pag
 	var mmap []byte
 	pcStats := PageCacheInfo{}
 	// void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset);
-	mmap, err := unix.Mmap(fd, 0, int(fileSize), unix.PROT_NONE, unix.MAP_SHARED)
+	mmap, err := unix.Mmap(fd, 0, int(fileSize), unix.PROT_READ, unix.MAP_SHARED)
 	if err != nil {
 		return pcStats, fmt.Errorf("Error while mmaping: %v", err)
 	}
@@ -126,6 +136,15 @@ func NewPcState() (pcState PcState, err error) {
 		// Nothing to do
 		return
 	}
+	c := cap.GetProc()
+	if on, err := c.GetFlag(cap.Permitted, cap.SETUID); err != nil {
+		fmt.Printf("unable to determine cap_setuid permitted flag value: %v\n", err)
+		return
+	} else if !on {
+		fmt.Println("no permitted capability, try: sudo setcap cap_setuid=p program")
+		return
+	}
+
 	pcState.pagemapFile, err = os.Open("/proc/self/pagemap")
 	return
 }

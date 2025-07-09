@@ -3,6 +3,7 @@ package relation
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/bonnefoa/pg_pagecache/pcstats"
 )
@@ -19,6 +20,7 @@ const (
 
 type OutputInfo interface {
 	ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string
+	ToFlagDetails() [][]string
 }
 
 type BaseInfo struct {
@@ -139,11 +141,12 @@ func (r *BaseInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory i
 }
 
 func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
-	return []string{r.Partition, r.Table, r.Name, kindToString(r.Kind), fmt.Sprintf("%d", r.Relfilenode),
+	res := []string{r.Partition, r.Table, r.Name, kindToString(r.Kind), fmt.Sprintf("%d", r.Relfilenode),
 		formatValue(r.PageCached, unit, page_size),
 		formatValue(r.PageCount, unit, page_size),
 		r.GetCachedPct(),
 		r.GetTotalCachedPct(file_memory)}
+	return res
 }
 
 func (t *TableInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
@@ -160,4 +163,30 @@ func (p *PartInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory i
 		formatValue(p.PageCount, unit, page_size),
 		p.GetCachedPct(),
 		p.GetTotalCachedPct(file_memory)}
+}
+
+func (r *BaseInfo) ToFlagDetails() [][]string {
+	return nil
+}
+
+func (r *RelInfo) ToFlagDetails() [][]string {
+	if r.PageCacheInfo.PageFlags == nil {
+		return nil
+	}
+
+	var res [][]string
+	for k, count := range r.PageCacheInfo.PageFlags {
+		// TODO: Add flag description list
+		res = append(res, []string{fmt.Sprintf("0x%x", k), fmt.Sprintf("%d", count)})
+	}
+
+	return nil
+}
+
+func (r *TableInfo) ToFlagDetails() [][]string {
+	return nil
+}
+
+func (r *PartInfo) ToFlagDetails() [][]string {
+	return nil
 }

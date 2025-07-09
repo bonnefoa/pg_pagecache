@@ -1,8 +1,8 @@
 package pcstats
 
 import (
+	"encoding/binary"
 	"fmt"
-	"log/slog"
 	"os"
 	"runtime"
 	"strconv"
@@ -16,15 +16,31 @@ import (
 type PageCacheInfo struct {
 	PageCached int
 	PageCount  int
+
+	PageFlags map[uint64]int
 }
+
+const (
+	KPF_REFERENCED = 1 << 2
+	KPF_UPTODATE   = 1 << 3
+	KPF_DIRTY      = 1 << 4
+	KPF_LRU        = 1 << 5
+	KPF_ACTIVE     = 1 << 6
+	KPF_WRITEBACK  = 1 << 8
+)
 
 type PcState struct {
 	pagemapFile *os.File
+	kpageFlags  *os.File
 }
 
 func (p *PageCacheInfo) Add(b PageCacheInfo) {
 	p.PageCount += b.PageCount
 	p.PageCached += b.PageCached
+
+	for k, v := range b.PageFlags {
+		p.PageFlags[k] += v
+	}
 }
 
 func (p *PageCacheInfo) GetCachedPct() string {
@@ -47,7 +63,7 @@ func GetPageSize() int64 {
 	return int64(os.Getpagesize())
 }
 
-func (p *PcState) getActivePages(mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
+func (p *PcState) getActivePages(pageCacheInfo *PageCacheInfo, mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
 	ret, _, err := syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_RANDOM)
 	if ret != 0 {
 		return fmt.Errorf("syscall MADVISE failed: %v", err)
@@ -56,7 +72,7 @@ func (p *PcState) getActivePages(mmapPtr uintptr, fileSizePtr uintptr, vec []byt
 	// Populate PTE
 	for i, v := range vec {
 		if v&0x1 > 0 {
-			_ = (*byte)(unsafe.Pointer(mmapPtr + uintptr(i)*uintptr(pageSize)))
+			_ = *(*byte)(unsafe.Pointer(mmapPtr + uintptr(int64(i)*pageSize)))
 		}
 	}
 
@@ -65,10 +81,12 @@ func (p *PcState) getActivePages(mmapPtr uintptr, fileSizePtr uintptr, vec []byt
 		return fmt.Errorf("syscall MADVISE failed: %v", err)
 	}
 
+	numPages := len(vec)
+
 	// One int64 per page
-	buf := make([]byte, len(vec)*8)
-	offset := int64(mmapPtr) / pageSize
-	n, err := p.pagemapFile.ReadAt(buf, offset*8)
+	buf := make([]byte, numPages*8)
+	offset := (int64(mmapPtr) / pageSize) * 8
+	n, err := p.pagemapFile.ReadAt(buf, offset)
 	if n != len(buf) || err != nil {
 		return fmt.Errorf("Error reading pagemap: %v", err)
 	}
@@ -78,11 +96,19 @@ func (p *PcState) getActivePages(mmapPtr uintptr, fileSizePtr uintptr, vec []byt
 	i64Len := len(buf) / i64Size
 	i64 := unsafe.Slice(i64Ptr, i64Len)
 
-	slog.Info("buf", "buf", buf)
-	for i, v := range vec {
-		if v&0x1 > 0 {
-			slog.Info("I64 value", "offset", offset, "i", i, "i64", i64[i])
+	for _, f := range i64 {
+		pfn := f & 0x7FFFFFFFFFFFFF
+		if pfn == 0 {
+			continue
 		}
+
+		kbuf := make([]byte, 8)
+		_, err = p.kpageFlags.ReadAt(kbuf, int64(pfn)*8)
+		if err != nil {
+			return err
+		}
+		flags := binary.LittleEndian.Uint64(kbuf)
+		pageCacheInfo.PageFlags[flags]++
 	}
 
 	return nil
@@ -90,11 +116,11 @@ func (p *PcState) getActivePages(mmapPtr uintptr, fileSizePtr uintptr, vec []byt
 
 func (p *PcState) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageCacheInfo, error) {
 	var mmap []byte
-	pcStats := PageCacheInfo{}
+	pageCacheInfo := PageCacheInfo{}
 	// void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset);
 	mmap, err := unix.Mmap(fd, 0, int(fileSize), unix.PROT_READ, unix.MAP_SHARED)
 	if err != nil {
-		return pcStats, fmt.Errorf("Error while mmaping: %v", err)
+		return pageCacheInfo, fmt.Errorf("Error while mmaping: %v", err)
 	}
 	defer unix.Munmap(mmap)
 
@@ -112,23 +138,26 @@ func (p *PcState) getPagecacheStats(fd int, fileSize int64, pageSize int64) (Pag
 
 	ret, _, err := syscall.Syscall(syscall.SYS_MINCORE, mmapPtr, fileSizePtr, vecPtr)
 	if ret != 0 {
-		return pcStats, fmt.Errorf("syscall SYS_MINCORE failed: %v", err)
+		return pageCacheInfo, fmt.Errorf("syscall SYS_MINCORE failed: %v", err)
 	}
 
-	pcStats.PageCount = len(vec)
-	pcStats.PageCached = 0
+	pageCacheInfo.PageCount = len(vec)
+	pageCacheInfo.PageCached = 0
 	for _, v := range vec {
 		// On return, the least significant bit of each byte will be set if the corresponding page is currently resident in memory, and be clear otherwise
 		if v&0x1 > 0 {
-			pcStats.PageCached = pcStats.PageCached + 1
+			pageCacheInfo.PageCached = pageCacheInfo.PageCached + 1
 		}
 	}
 
 	if runtime.GOOS == "linux" {
-		err = p.getActivePages(mmapPtr, fileSizePtr, vec, pageSize)
+		err = p.getActivePages(&pageCacheInfo, mmapPtr, fileSizePtr, vec, pageSize)
+		if err != nil {
+			return pageCacheInfo, err
+		}
 	}
 
-	return pcStats, err
+	return pageCacheInfo, nil
 }
 
 func NewPcState() (pcState PcState, err error) {
@@ -136,37 +165,37 @@ func NewPcState() (pcState PcState, err error) {
 		// Nothing to do
 		return
 	}
-	c := cap.GetProc()
-	if on, err := c.GetFlag(cap.Permitted, cap.SETUID); err != nil {
-		fmt.Printf("unable to determine cap_setuid permitted flag value: %v\n", err)
-		return
-	} else if !on {
-		fmt.Println("no permitted capability, try: sudo setcap cap_setuid=p program")
+
+	mode := os.FileMode(0600)
+	pcState.pagemapFile, err = os.OpenFile("/proc/self/pagemap", os.O_RDONLY, mode)
+	if err != nil {
 		return
 	}
-
-	pcState.pagemapFile, err = os.Open("/proc/self/pagemap")
+	pcState.kpageFlags, err = os.OpenFile("/proc/kpageflags", os.O_RDONLY, mode)
+	if err != nil {
+		return
+	}
 	return
 }
 
 func (p *PcState) GetPcStats(fullPath string, pagesize int64) (PageCacheInfo, error) {
-	pcStats := PageCacheInfo{}
+	pageCacheInfo := PageCacheInfo{}
 	file, err := os.Open(fullPath)
 	if err != nil {
-		return pcStats, fmt.Errorf("Error opening file %s: %v", fullPath, err)
+		return pageCacheInfo, fmt.Errorf("Error opening file %s: %v", fullPath, err)
 	}
 	defer file.Close()
 	fileInfo, err := file.Stat()
 	if err != nil {
-		return pcStats, fmt.Errorf("Error getting file stat %s: %v", fullPath, err)
+		return pageCacheInfo, fmt.Errorf("Error getting file stat %s: %v", fullPath, err)
 	}
 	fileSize := fileInfo.Size()
 	if fileSize == 0 {
-		return pcStats, nil
+		return pageCacheInfo, nil
 	}
-	pcStats, err = p.getPagecacheStats(int(file.Fd()), fileInfo.Size(), pagesize)
+	pageCacheInfo, err = p.getPagecacheStats(int(file.Fd()), fileInfo.Size(), pagesize)
 	if err != nil {
-		return pcStats, fmt.Errorf("Getting pagecache stats for %s failed: %v", fullPath, err)
+		return pageCacheInfo, fmt.Errorf("Getting pagecache stats for %s failed: %v", fullPath, err)
 	}
-	return pcStats, nil
+	return pageCacheInfo, nil
 }

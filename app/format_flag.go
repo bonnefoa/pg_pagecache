@@ -8,7 +8,6 @@ import (
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
-type FormatAggregation int
 type FormatSort int
 type FormatType int
 
@@ -18,19 +17,13 @@ type FormatOptions struct {
 	Type        FormatType
 	Sort        FormatSort
 	NoHeader    bool
-	Aggregation FormatAggregation
+	Aggregation relation.AggregationType
 }
 
 const (
 	SortName FormatSort = iota
 	SortPageCached
 	SortPageCount
-
-	AggNone FormatAggregation = iota
-	AggTable
-	AggTableOnly
-	AggPartition
-	AggPartitionOnly
 
 	FormatCSV = iota
 	FormatColumn
@@ -42,14 +35,6 @@ var (
 		"name":       SortName,
 		"pagecached": SortPageCached,
 		"pagecount":  SortPageCount,
-	}
-
-	formatAggregationMap = map[string]FormatAggregation{
-		"none":           AggNone,
-		"table":          AggTable,
-		"table_only":     AggTableOnly,
-		"partition":      AggPartition,
-		"partition_only": AggPartitionOnly,
 	}
 
 	formatUnitMap = map[string]relation.FormatUnit{
@@ -90,15 +75,6 @@ func parseSort(s string) (FormatSort, error) {
 	return sortOutput, nil
 }
 
-func parseAggregation(s string) (FormatAggregation, error) {
-	agg, ok := formatAggregationMap[strings.ToLower(s)]
-	if !ok {
-		err := fmt.Errorf("Unknown aggregation: %v\n", s)
-		return agg, err
-	}
-	return agg, nil
-}
-
 func parseUnitFlag(s string) (relation.FormatUnit, error) {
 	res, ok := formatUnitMap[strings.ToLower(s)]
 	if !ok {
@@ -123,7 +99,7 @@ func ParseFormatOptions() (FormatOptions, error) {
 	if err != nil {
 		return formatOptions, err
 	}
-	formatOptions.Aggregation, err = parseAggregation(aggregationFlag)
+	formatOptions.Aggregation, err = relation.ParseAggregation(aggregationFlag)
 	if err != nil {
 		return formatOptions, err
 	}

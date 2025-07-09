@@ -7,6 +7,16 @@ import (
 	"github.com/bonnefoa/pg_pagecache/pcstats"
 )
 
+type AggregationType int
+
+const (
+	AggNone AggregationType = iota
+	AggTable
+	AggTableOnly
+	AggPartition
+	AggPartitionOnly
+)
+
 type OutputInfo interface {
 	ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string
 }
@@ -35,7 +45,17 @@ type RelInfo struct {
 	Relfilenode uint32
 }
 
-var TotalInfo = BaseInfo{Name: "Total", Kind: 'S'}
+var (
+	TotalInfo = BaseInfo{Name: "Total", Kind: 'S'}
+
+	formatAggregationMap = map[string]AggregationType{
+		"none":           AggNone,
+		"table":          AggTable,
+		"table_only":     AggTableOnly,
+		"partition":      AggPartition,
+		"partition_only": AggPartitionOnly,
+	}
+)
 
 const (
 	UnitPage FormatUnit = iota
@@ -62,6 +82,38 @@ func unitToString(u FormatUnit) string {
 		return "GB"
 	}
 	return "?"
+}
+
+func ParseAggregation(s string) (AggregationType, error) {
+	agg, ok := formatAggregationMap[strings.ToLower(s)]
+	if !ok {
+		err := fmt.Errorf("Unknown aggregation: %v\n", s)
+		return agg, err
+	}
+	return agg, nil
+}
+
+func GetHeader(agg AggregationType) []string {
+	var res []string
+
+	switch agg {
+	case AggPartition:
+		fallthrough
+	case AggPartitionOnly:
+		res = append(res, "Partition")
+		fallthrough
+	case AggTable:
+		fallthrough
+	case AggTableOnly:
+		res = append(res, "Table")
+	case AggNone: // Nothing to do
+	}
+
+	res = append(res, []string{"Relation", "Kind", "Relfilenode",
+		"PageCached", "PageCount",
+		"%Cached", "%Total"}...)
+
+	return res
 }
 
 func formatValue(value int, unit FormatUnit, page_size int64) (valueStr string) {

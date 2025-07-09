@@ -109,17 +109,17 @@ func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPagecache, e
 
 func (p *PgPagecache) getOutputInfos() ([]relation.OutputInfo, error) {
 	switch p.Aggregation {
-	case AggNone:
+	case relation.AggNone:
 		return p.formatNoAggregation()
 
-	case AggPartition:
+	case relation.AggPartition:
 		fallthrough
-	case AggPartitionOnly:
+	case relation.AggPartitionOnly:
 		return p.formatAggregatePartitions()
 
-	case AggTable:
+	case relation.AggTable:
 		fallthrough
-	case AggTableOnly:
+	case relation.AggTableOnly:
 		return p.formatAggregatedTables()
 	}
 	panic("Unreachable code")

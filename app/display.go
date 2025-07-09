@@ -11,29 +11,6 @@ import (
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
-func (p *PgPagecache) getHeader() []string {
-	var res []string
-
-	switch p.Aggregation {
-	case AggPartition:
-		fallthrough
-	case AggPartitionOnly:
-		res = append(res, "Partition")
-		fallthrough
-	case AggTable:
-		fallthrough
-	case AggTableOnly:
-		res = append(res, "Table")
-	case AggNone: // Nothing to do
-	}
-
-	res = append(res, []string{"Relation", "Kind", "Relfilenode",
-		"PageCached", "PageCount",
-		"%Cached", "%Total"}...)
-
-	return res
-}
-
 func (p *PgPagecache) outputResults(outputInfos []relation.OutputInfo) error {
 	var values [][]string
 

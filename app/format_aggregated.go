@@ -28,7 +28,7 @@ func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInf
 		outputInfos = append(outputInfos, &tableInfo)
 		total.Add(tableInfo.PageCacheInfo)
 
-		if p.Aggregation == AggTableOnly {
+		if p.Aggregation == relation.AggTableOnly {
 			// Skip printing children
 			continue
 		}
@@ -58,7 +58,7 @@ func (p *PgPagecache) formatAggregatePartitions() (outputInfos []relation.Output
 
 		outputInfos = append(outputInfos, &partInfo)
 		total.Add(partInfo.PageCacheInfo)
-		if p.Aggregation == AggPartitionOnly {
+		if p.Aggregation == relation.AggPartitionOnly {
 			continue
 		}
 

@@ -14,21 +14,13 @@ import (
 func (p *PgPagecache) outputResults(outputInfos []relation.OutputInfo) error {
 	var values [][]string
 
-	header := p.getHeader()
+	header := relation.GetHeader(p.Aggregation)
 	if !p.NoHeader && p.Type != FormatJson {
 		values = append(values, header)
 	}
 
 	for _, v := range outputInfos {
-		line := v.ToStringArray(p.Unit, p.page_size, p.file_memory)
-		switch p.Aggregation {
-		case AggNone:
-			line = line[2:]
-		case AggTable:
-			fallthrough
-		case AggTableOnly:
-			line = line[1:]
-		}
+		line := v.ToStringArray(p.Aggregation, p.Unit, p.page_size, p.file_memory)
 		values = append(values, line)
 	}
 
@@ -57,6 +49,16 @@ func (p *PgPagecache) outputResults(outputInfos []relation.OutputInfo) error {
 			fmt.Fprintln(w, strings.Join(v, "\t"))
 		}
 		w.Flush()
+
+		fmt.Printf("\nPage Flags\n")
+		fmt.Fprintln(w, strings.Join([]string{"Relation", "Flags", "Symbolic Flags", "Count"}, "\t"))
+		for _, v := range outputInfos {
+			for _, flag := range v.ToFlagDetails() {
+				fmt.Fprintln(w, strings.Join(flag, "\t"))
+			}
+		}
+		w.Flush()
+
 	}
 	return nil
 }

@@ -19,7 +19,7 @@ const (
 )
 
 type OutputInfo interface {
-	ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string
+	ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string
 	ToFlagDetails() [][]string
 }
 
@@ -47,6 +47,8 @@ type RelInfo struct {
 	Relfilenode uint32
 }
 
+type FormatUnit int
+
 var (
 	TotalInfo = BaseInfo{Name: "Total", Kind: 'S'}
 
@@ -69,8 +71,6 @@ const (
 	mebibyte = float64(1 << 20)
 	gebibyte = float64(1 << 30)
 )
-
-type FormatUnit int
 
 func unitToString(u FormatUnit) string {
 	switch u {
@@ -132,41 +132,84 @@ func formatValue(value int, unit FormatUnit, page_size int64) (valueStr string) 
 	return fmt.Sprintf("%s %s", valueStr, unitToString(unit))
 }
 
-func (r *BaseInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
-	return []string{"", "", r.Name, kindToString(r.Kind), "",
+func adjustLine(agg AggregationType, line []string) []string {
+	switch agg {
+	case AggNone:
+		line = line[2:]
+	case AggTable:
+		fallthrough
+	case AggTableOnly:
+		line = line[1:]
+	}
+	return line
+}
+
+func (r *BaseInfo) ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string {
+	res := []string{"", "", r.Name, kindToString(r.Kind), "",
 		formatValue(r.PageCached, unit, page_size),
 		formatValue(r.PageCount, unit, page_size),
 		r.GetCachedPct(),
 		r.GetTotalCachedPct(file_memory)}
+	return adjustLine(agg, res)
 }
 
-func (r *RelInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
+func (r *RelInfo) ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string {
 	res := []string{r.Partition, r.Table, r.Name, kindToString(r.Kind), fmt.Sprintf("%d", r.Relfilenode),
 		formatValue(r.PageCached, unit, page_size),
 		formatValue(r.PageCount, unit, page_size),
 		r.GetCachedPct(),
 		r.GetTotalCachedPct(file_memory)}
-	return res
+	return adjustLine(agg, res)
 }
 
-func (t *TableInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
-	return []string{t.Partition, t.Name, "", kindToString(t.Kind), "",
+func (t *TableInfo) ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string {
+	res := []string{t.Partition, t.Name, "", kindToString(t.Kind), "",
 		formatValue(t.PageCached, unit, page_size),
 		formatValue(t.PageCount, unit, page_size),
 		t.GetCachedPct(),
 		t.GetTotalCachedPct(file_memory)}
+	return adjustLine(agg, res)
 }
 
-func (p *PartInfo) ToStringArray(unit FormatUnit, page_size int64, file_memory int64) []string {
-	return []string{p.Name, "", "", kindToString(p.Kind), "",
+func (p *PartInfo) ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string {
+	res := []string{p.Name, "", "", kindToString(p.Kind), "",
 		formatValue(p.PageCached, unit, page_size),
 		formatValue(p.PageCount, unit, page_size),
 		p.GetCachedPct(),
 		p.GetTotalCachedPct(file_memory)}
+	return adjustLine(agg, res)
 }
 
 func (r *BaseInfo) ToFlagDetails() [][]string {
 	return nil
+}
+
+func pageFlagToString(f uint64) string {
+	if f == 0 {
+		return ""
+	}
+
+	res := strings.Builder{}
+	if f&pcstats.KPF_REFERENCED > 0 {
+		res.WriteString("referenced,")
+	}
+	if f&pcstats.KPF_UPTODATE > 0 {
+		res.WriteString("uptodate,")
+	}
+	if f&pcstats.KPF_DIRTY > 0 {
+		res.WriteString("dirty,")
+	}
+	if f&pcstats.KPF_LRU > 0 {
+		res.WriteString("lru,")
+	}
+	if f&pcstats.KPF_ACTIVE > 0 {
+		res.WriteString("active,")
+	}
+	if f&pcstats.KPF_WRITEBACK > 0 {
+		res.WriteString("writeback,")
+	}
+
+	return strings.Trim(res.String(), ",")
 }
 
 func (r *RelInfo) ToFlagDetails() [][]string {
@@ -175,12 +218,12 @@ func (r *RelInfo) ToFlagDetails() [][]string {
 	}
 
 	var res [][]string
-	for k, count := range r.PageCacheInfo.PageFlags {
-		// TODO: Add flag description list
-		res = append(res, []string{fmt.Sprintf("0x%x", k), fmt.Sprintf("%d", count)})
+	for flag, count := range r.PageCacheInfo.PageFlags {
+		res = append(res, []string{
+			r.Name, fmt.Sprintf("0x%016x", flag), pageFlagToString(flag), fmt.Sprintf("%d", count)})
 	}
 
-	return nil
+	return res
 }
 
 func (r *TableInfo) ToFlagDetails() [][]string {

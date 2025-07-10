@@ -13,21 +13,22 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const (
+	KPF_REFERENCED          = 1 << 2
+	KPF_UPTODATE            = 1 << 3
+	KPF_DIRTY               = 1 << 4
+	KPF_LRU                 = 1 << 5
+	KPF_ACTIVE              = 1 << 6
+	KPF_WRITEBACK           = 1 << 8
+	KPF_HACKERS_BITS uint64 = 0xffff << 32
+)
+
 type PageCacheInfo struct {
 	PageCached int
 	PageCount  int
 
 	PageFlags map[uint64]int
 }
-
-const (
-	KPF_REFERENCED = 1 << 2
-	KPF_UPTODATE   = 1 << 3
-	KPF_DIRTY      = 1 << 4
-	KPF_LRU        = 1 << 5
-	KPF_ACTIVE     = 1 << 6
-	KPF_WRITEBACK  = 1 << 8
-)
 
 type PcState struct {
 	pagemapFile *os.File
@@ -38,6 +39,9 @@ func (p *PageCacheInfo) Add(b PageCacheInfo) {
 	p.PageCount += b.PageCount
 	p.PageCached += b.PageCached
 
+	if p.PageFlags == nil {
+		p.PageFlags = make(map[uint64]int)
+	}
 	for k, v := range b.PageFlags {
 		p.PageFlags[k] += v
 	}
@@ -107,7 +111,7 @@ func (p *PcState) getActivePages(pageCacheInfo *PageCacheInfo, mmapPtr uintptr, 
 		if err != nil {
 			return err
 		}
-		flags := binary.LittleEndian.Uint64(kbuf)
+		flags := binary.LittleEndian.Uint64(kbuf) & ^KPF_HACKERS_BITS
 		pageCacheInfo.PageFlags[flags]++
 	}
 
@@ -116,7 +120,7 @@ func (p *PcState) getActivePages(pageCacheInfo *PageCacheInfo, mmapPtr uintptr, 
 
 func (p *PcState) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageCacheInfo, error) {
 	var mmap []byte
-	pageCacheInfo := PageCacheInfo{}
+	pageCacheInfo := PageCacheInfo{0, 0, make(map[uint64]int, 0)}
 	// void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset);
 	mmap, err := unix.Mmap(fd, 0, int(fileSize), unix.PROT_READ, unix.MAP_SHARED)
 	if err != nil {
@@ -179,7 +183,7 @@ func NewPcState() (pcState PcState, err error) {
 }
 
 func (p *PcState) GetPcStats(fullPath string, pagesize int64) (PageCacheInfo, error) {
-	pageCacheInfo := PageCacheInfo{}
+	pageCacheInfo := PageCacheInfo{0, 0, make(map[uint64]int, 0)}
 	file, err := os.Open(fullPath)
 	if err != nil {
 		return pageCacheInfo, fmt.Errorf("Error opening file %s: %v", fullPath, err)

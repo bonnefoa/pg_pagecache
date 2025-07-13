@@ -1,7 +1,6 @@
 package pagecache
 
 import (
-	"encoding/binary"
 	"fmt"
 	"os"
 	"runtime"
@@ -34,10 +33,11 @@ type PageStats struct {
 
 // State stores state for page cache related functions
 type State struct {
-	pagemapFile *os.File
-	kpageFlags  *os.File
+	pagemapFile    *os.File
+	kpageFlagsFile *os.File
 }
 
+// Add adds stats from provided pageStats
 func (p *PageStats) Add(b PageStats) {
 	p.PageCount += b.PageCount
 	p.PageCached += b.PageCached
@@ -50,6 +50,7 @@ func (p *PageStats) Add(b PageStats) {
 	}
 }
 
+// GetCachedPct returns the percent of cached pages as a string
 func (p *PageStats) GetCachedPct() string {
 	if p.PageCached > 0 {
 		value := 100 * float64(p.PageCached) / float64(p.PageCount)
@@ -58,6 +59,7 @@ func (p *PageStats) GetCachedPct() string {
 	return "0"
 }
 
+// GetTotalCachedPct returns the percent of total cached pages as a string
 func (p *PageStats) GetTotalCachedPct(totalCached int64) string {
 	if p.PageCached > 0 && totalCached > 0 {
 		value := 100 * float64(p.PageCached) / float64(totalCached)
@@ -66,8 +68,24 @@ func (p *PageStats) GetTotalCachedPct(totalCached int64) string {
 	return "0"
 }
 
+// GetPageSize returns the os page size
 func GetPageSize() int64 {
 	return int64(os.Getpagesize())
+}
+
+// readInt64SliceFromFile reads int64 elements from a file. Size and index are in int64 elements, not in bytes
+func readInt64SliceFromFile(f *os.File, size int, index int64) ([]uint64, error) {
+	buf := make([]byte, 8*size)
+	n, err := f.ReadAt(buf, index*8)
+	if n != len(buf) || err != nil {
+		return nil, fmt.Errorf("Error reading pagemap: %v", err)
+	}
+
+	// Convert []byte to []uint64
+	const ui64Size = int(unsafe.Sizeof(uint64(0)))
+	ui64Ptr := (*uint64)(unsafe.Pointer(unsafe.SliceData(buf)))
+	ui64Len := len(buf) / ui64Size
+	return unsafe.Slice(ui64Ptr, ui64Len), nil
 }
 
 func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
@@ -89,33 +107,23 @@ func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePt
 	}
 
 	numPages := len(vec)
-
-	// One int64 per page
-	buf := make([]byte, numPages*8)
-	offset := (int64(mmapPtr) / pageSize) * 8
-	n, err := p.pagemapFile.ReadAt(buf, offset)
-	if n != len(buf) || err != nil {
-		return fmt.Errorf("Error reading pagemap: %v", err)
+	indexPages := (int64(mmapPtr) / pageSize)
+	pagemapFlags, err := readInt64SliceFromFile(p.pagemapFile, numPages, indexPages)
+	if err != nil {
+		return fmt.Errorf("error reading pagemap flags: %v", err)
 	}
 
-	const i64Size = int(unsafe.Sizeof(int64(0)))
-	i64Ptr := (*int64)(unsafe.Pointer(unsafe.SliceData(buf)))
-	i64Len := len(buf) / i64Size
-	i64 := unsafe.Slice(i64Ptr, i64Len)
-
-	for _, f := range i64 {
+	for _, f := range pagemapFlags {
 		pfn := f & 0x7FFFFFFFFFFFFF
 		if pfn == 0 {
 			continue
 		}
 
-		kbuf := make([]byte, 8)
-		_, err = p.kpageFlags.ReadAt(kbuf, int64(pfn)*8)
+		flags, err := readInt64SliceFromFile(p.kpageFlagsFile, 1, int64(pfn))
 		if err != nil {
 			return err
 		}
-		flags := binary.LittleEndian.Uint64(kbuf) & ^KpfHackerBits
-		pageStats.PageFlags[flags]++
+		pageStats.PageFlags[flags[0]]++
 	}
 
 	return nil
@@ -178,7 +186,7 @@ func NewPageCacheState() (state State, err error) {
 	if err != nil {
 		return
 	}
-	state.kpageFlags, err = os.OpenFile("/proc/kpageflags", os.O_RDONLY, mode)
+	state.kpageFlagsFile, err = os.OpenFile("/proc/kpageflags", os.O_RDONLY, mode)
 	if err != nil {
 		return
 	}

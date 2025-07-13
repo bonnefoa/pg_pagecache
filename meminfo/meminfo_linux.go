@@ -12,7 +12,7 @@ import (
 )
 
 // GetCachedMemory fetches cached memory from /proc/memory. Returns memory in pages
-func GetCachedMemory(page_size int64) (int64, error) {
+func GetCachedMemory(pageSize int64) (int64, error) {
 	file, err := os.Open("/proc/meminfo")
 	if err != nil {
 		return 0, err
@@ -24,8 +24,8 @@ func GetCachedMemory(page_size int64) (int64, error) {
 		text := scanner.Text()
 		// Looking for 'Cached:         236072800 kB'
 		parts := strings.Split(text, ":")
-		metric_name := parts[0]
-		if metric_name != "Cached" {
+		metricName := parts[0]
+		if metricName != "Cached" {
 			continue
 		}
 
@@ -38,7 +38,7 @@ func GetCachedMemory(page_size int64) (int64, error) {
 
 		// meminfo provides memory in kB
 		// We want to convert it in pages
-		return value / (page_size / 1024), err
+		return value / (pageSize / 1024), err
 	}
 
 	return 0, fmt.Errorf("Cached memory not found")

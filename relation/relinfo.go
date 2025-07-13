@@ -19,7 +19,7 @@ const (
 )
 
 type OutputInfo interface {
-	ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string
+	ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string
 	ToFlagDetails() [][]string
 }
 
@@ -118,16 +118,16 @@ func GetHeader(agg AggregationType) []string {
 	return res
 }
 
-func formatValue(value int, unit FormatUnit, page_size int64) (valueStr string) {
+func formatValue(value int, unit FormatUnit, pageSize int64) (valueStr string) {
 	switch unit {
 	case UnitPage:
 		valueStr = strconv.FormatInt(int64(value), 10)
 	case UnitKB:
-		valueStr = strconv.FormatFloat(float64(int64(value)*page_size)/kebibyte, 'f', -1, 64)
+		valueStr = strconv.FormatFloat(float64(int64(value)*pageSize)/kebibyte, 'f', -1, 64)
 	case UnitMB:
-		valueStr = strconv.FormatFloat(float64(int64(value)*page_size)/mebibyte, 'f', 2, 64)
+		valueStr = strconv.FormatFloat(float64(int64(value)*pageSize)/mebibyte, 'f', 2, 64)
 	case UnitGB:
-		valueStr = strconv.FormatFloat(float64(int64(value)*page_size)/gebibyte, 'f', 2, 64)
+		valueStr = strconv.FormatFloat(float64(int64(value)*pageSize)/gebibyte, 'f', 2, 64)
 	}
 	return fmt.Sprintf("%s %s", valueStr, unitToString(unit))
 }
@@ -144,39 +144,39 @@ func adjustLine(agg AggregationType, line []string) []string {
 	return line
 }
 
-func (r *BaseInfo) ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string {
+func (r *BaseInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string {
 	res := []string{"", "", r.Name, kindToString(r.Kind), "",
-		formatValue(r.PageCached, unit, page_size),
-		formatValue(r.PageCount, unit, page_size),
+		formatValue(r.PageCached, unit, pageSize),
+		formatValue(r.PageCount, unit, pageSize),
 		r.GetCachedPct(),
-		r.GetTotalCachedPct(file_memory)}
+		r.GetTotalCachedPct(fileMemory)}
 	return adjustLine(agg, res)
 }
 
-func (r *RelInfo) ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string {
+func (r *RelInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string {
 	res := []string{r.Partition, r.Table, r.Name, kindToString(r.Kind), fmt.Sprintf("%d", r.Relfilenode),
-		formatValue(r.PageCached, unit, page_size),
-		formatValue(r.PageCount, unit, page_size),
+		formatValue(r.PageCached, unit, pageSize),
+		formatValue(r.PageCount, unit, pageSize),
 		r.GetCachedPct(),
-		r.GetTotalCachedPct(file_memory)}
+		r.GetTotalCachedPct(fileMemory)}
 	return adjustLine(agg, res)
 }
 
-func (t *TableInfo) ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string {
+func (t *TableInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string {
 	res := []string{t.Partition, t.Name, "", kindToString(t.Kind), "",
-		formatValue(t.PageCached, unit, page_size),
-		formatValue(t.PageCount, unit, page_size),
+		formatValue(t.PageCached, unit, pageSize),
+		formatValue(t.PageCount, unit, pageSize),
 		t.GetCachedPct(),
-		t.GetTotalCachedPct(file_memory)}
+		t.GetTotalCachedPct(fileMemory)}
 	return adjustLine(agg, res)
 }
 
-func (p *PartInfo) ToStringArray(agg AggregationType, unit FormatUnit, page_size int64, file_memory int64) []string {
+func (p *PartInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string {
 	res := []string{p.Name, "", "", kindToString(p.Kind), "",
-		formatValue(p.PageCached, unit, page_size),
-		formatValue(p.PageCount, unit, page_size),
+		formatValue(p.PageCached, unit, pageSize),
+		formatValue(p.PageCount, unit, pageSize),
 		p.GetCachedPct(),
-		p.GetTotalCachedPct(file_memory)}
+		p.GetTotalCachedPct(fileMemory)}
 	return adjustLine(agg, res)
 }
 
@@ -190,22 +190,22 @@ func pageFlagToString(f uint64) string {
 	}
 
 	res := strings.Builder{}
-	if f&pagecache.KPF_REFERENCED > 0 {
+	if f&pagecache.KpfReferenced > 0 {
 		res.WriteString("referenced,")
 	}
-	if f&pagecache.KPF_UPTODATE > 0 {
+	if f&pagecache.KpfUptodate > 0 {
 		res.WriteString("uptodate,")
 	}
-	if f&pagecache.KPF_DIRTY > 0 {
+	if f&pagecache.KpfDirty > 0 {
 		res.WriteString("dirty,")
 	}
-	if f&pagecache.KPF_LRU > 0 {
+	if f&pagecache.KpfLRU > 0 {
 		res.WriteString("lru,")
 	}
-	if f&pagecache.KPF_ACTIVE > 0 {
+	if f&pagecache.KpfActive > 0 {
 		res.WriteString("active,")
 	}
-	if f&pagecache.KPF_WRITEBACK > 0 {
+	if f&pagecache.KpfWriteback > 0 {
 		res.WriteString("writeback,")
 	}
 

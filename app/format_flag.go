@@ -25,13 +25,19 @@ type FormatFlags struct {
 }
 
 const (
+	// SortName sorts by name
 	SortName FormatSort = iota
+	// SortPageCached sorts by number of cached pages
 	SortPageCached
+	// SortPageCount sorts by number of pages
 	SortPageCount
 
+	// FormatCSV outputs the result using CSV
 	FormatCSV = iota
+	// FormatColumn outputs the result using aligned column
 	FormatColumn
-	FormatJson
+	// FormatJSON outputs the result using JSON
+	FormatJSON
 )
 
 var (
@@ -51,7 +57,7 @@ var (
 	formatTypeMap = map[string]FormatType{
 		"csv":    FormatCSV,
 		"column": FormatColumn,
-		"json":   FormatJson,
+		"json":   FormatJSON,
 	}
 
 	formatFlags     FormatFlags
@@ -73,7 +79,7 @@ func init() {
 func parseSort(s string) (FormatSort, error) {
 	sortOutput, ok := formatSortMap[strings.ToLower(s)]
 	if !ok {
-		err := fmt.Errorf("Unknown sort: %v\n", s)
+		err := fmt.Errorf("unknown sort: %v", s)
 		return sortOutput, err
 	}
 	return sortOutput, nil
@@ -82,7 +88,7 @@ func parseSort(s string) (FormatSort, error) {
 func parseUnitFlag(s string) (relation.FormatUnit, error) {
 	res, ok := formatUnitMap[strings.ToLower(s)]
 	if !ok {
-		err := fmt.Errorf("Unknown unit: %v\n", s)
+		err := fmt.Errorf("unknown unit: %v", s)
 		return res, err
 	}
 	return res, nil
@@ -91,12 +97,13 @@ func parseUnitFlag(s string) (relation.FormatUnit, error) {
 func parseTypeFlag(s string) (FormatType, error) {
 	res, ok := formatTypeMap[strings.ToLower(s)]
 	if !ok {
-		err := fmt.Errorf("Unknown format type: %v\n", s)
+		err := fmt.Errorf("unknown format type: %v", s)
 		return res, err
 	}
 	return res, nil
 }
 
+// ParseFormatOptions parses and return FormatFlags with parsed values
 func ParseFormatOptions() (FormatFlags, error) {
 	var err error
 	formatFlags.Sort, err = parseSort(sortFlag)

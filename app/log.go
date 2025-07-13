@@ -20,10 +20,11 @@ func init() {
 	flag.StringVar(&logLevelFlag, "log", "warning", "Log level")
 }
 
+// SetLogLevel sets the log level to the provided cli flag
 func SetLogLevel() error {
 	level, ok := logLevelMap[strings.ToLower(logLevelFlag)]
 	if !ok {
-		err := fmt.Errorf("Unknown log level: %v\n", logLevelFlag)
+		err := fmt.Errorf("unknown log level: %v", logLevelFlag)
 		return err
 	}
 	slog.SetLogLoggerLevel(level)

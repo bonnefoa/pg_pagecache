@@ -14,7 +14,7 @@ import (
 )
 
 // GetCachedMemory fetches the size of cached memory in pages
-func GetCachedMemory(page_size int64) (int64, error) {
+func GetCachedMemory(pageSize int64) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -30,21 +30,21 @@ func GetCachedMemory(page_size int64) (int64, error) {
 
 	scanner := bufio.NewScanner(out)
 
-	pattern_cached := regexp.MustCompile("File-backed pages: +([0-9]+).")
+	patternCached := regexp.MustCompile("File-backed pages: +([0-9]+).")
 	for scanner.Scan() {
 		text := scanner.Text()
-		res := pattern_cached.FindStringSubmatch(text)
+		res := patternCached.FindStringSubmatch(text)
 		if res == nil {
 			continue
 		}
 		file_backed_pages, err := strconv.ParseInt(res[1], 10, 32)
 		if err != nil {
-			slog.Error("Couldn't parse cached memory", "error", err)
+			slog.Error("couldn't parse cached memory", "error", err)
 			return 0, err
 		}
 
 		return file_backed_pages, err
 	}
 
-	return 0, fmt.Errorf("Cached memory not found")
+	return 0, fmt.Errorf("cached memory not found")
 }

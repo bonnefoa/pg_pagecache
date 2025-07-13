@@ -15,12 +15,12 @@ func (p *PgPageCache) outputResults(outputInfos []relation.OutputInfo) error {
 	var values [][]string
 
 	header := relation.GetHeader(p.Aggregation)
-	if !p.NoHeader && p.Type != FormatJson {
+	if !p.NoHeader && p.Type != FormatJSON {
 		values = append(values, header)
 	}
 
 	for _, v := range outputInfos {
-		line := v.ToStringArray(p.Aggregation, p.Unit, p.page_size, p.file_memory)
+		line := v.ToStringArray(p.Aggregation, p.Unit, p.pageSize, p.fileMemory)
 		values = append(values, line)
 	}
 
@@ -29,7 +29,7 @@ func (p *PgPageCache) outputResults(outputInfos []relation.OutputInfo) error {
 		w := csv.NewWriter(os.Stdout)
 		w.WriteAll(values)
 		return w.Error()
-	case FormatJson:
+	case FormatJSON:
 		m := make([]map[string]string, 0)
 		for _, line := range values {
 			o := make(map[string]string, 0)

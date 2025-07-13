@@ -13,14 +13,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Kernel Page cache flags
 const (
-	KPF_REFERENCED          = 1 << 2
-	KPF_UPTODATE            = 1 << 3
-	KPF_DIRTY               = 1 << 4
-	KPF_LRU                 = 1 << 5
-	KPF_ACTIVE              = 1 << 6
-	KPF_WRITEBACK           = 1 << 8
-	KPF_HACKERS_BITS uint64 = 0xffff << 32
+	KpfReferenced        = 1 << 2
+	KpfUptodate          = 1 << 3
+	KpfDirty             = 1 << 4
+	KpfLRU               = 1 << 5
+	KpfActive            = 1 << 6
+	KpfWriteback         = 1 << 8
+	KpfHackerBits uint64 = 0xffff << 32
 )
 
 // PageCacheInfo stores page cache information
@@ -112,7 +113,7 @@ func (p *PageCacheState) getActivePages(pageCacheInfo *PageCacheInfo, mmapPtr ui
 		if err != nil {
 			return err
 		}
-		flags := binary.LittleEndian.Uint64(kbuf) & ^KPF_HACKERS_BITS
+		flags := binary.LittleEndian.Uint64(kbuf) & ^KpfHackerBits
 		pageCacheInfo.PageFlags[flags]++
 	}
 

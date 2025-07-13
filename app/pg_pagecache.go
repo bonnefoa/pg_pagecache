@@ -15,25 +15,26 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// PgPageCache stores the args and state of the pg_pagecache app
 type PgPageCache struct {
 	CliArgs
 	conn *pgx.Conn
 
 	dbid           uint32
 	database       string
-	page_size      int64
-	file_memory    int64 // Cache memory without shared_buffers
+	pageSize       int64
+	fileMemory     int64 // Cache memory without shared_buffers
 	partitions     []relation.PartInfo
 	pageCacheState pagecache.PageCacheState
 }
 
 // getSharedBuffers returns the amount of shared_buffers memory in 4KB pages
-func (p *PgPageCache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (shared_buffers int, err error) {
+func (p *PgPageCache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (sharedBuffers int, err error) {
 	row := conn.QueryRow(ctx, "SELECT setting::int FROM pg_settings where name='shared_buffers'")
-	err = row.Scan(&shared_buffers)
+	err = row.Scan(&sharedBuffers)
 
 	// pg_settings uses 8Kb blocks, we want 4KB pages
-	return shared_buffers / 2, err
+	return sharedBuffers / 2, err
 }
 
 func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
@@ -56,7 +57,7 @@ func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
 			return
 		}
 
-		segmentPcStats, err := p.pageCacheState.GetPageCacheInfo(fullPath, p.page_size)
+		segmentPcStats, err := p.pageCacheState.GetPageCacheInfo(fullPath, p.pageSize)
 		if err != nil {
 			return err
 		}
@@ -125,11 +126,14 @@ func (p *PgPageCache) getOutputInfos() ([]relation.OutputInfo, error) {
 	panic("Unreachable code")
 }
 
+// Run executes the pg_pagecache. It will fetch database and relation
+// informations from the running postgres, then fetch page cache stats
+// on those relations
 func (p *PgPageCache) Run(ctx context.Context) (err error) {
 	// Fetch dbid and database
 	err = p.conn.QueryRow(ctx, "select oid, datname from pg_database where datname=current_database()").Scan(&p.dbid, &p.database)
 	if err != nil {
-		err = fmt.Errorf("Error getting current database: %v\n", err)
+		err = fmt.Errorf("error getting current database: %v", err)
 		return
 	}
 	slog.Info("Fetched database details", "database", p.database, "dbid", p.dbid)
@@ -137,13 +141,13 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 	// Fill the partition -> []Table map
 	p.partitions, err = relation.GetPartitionToTables(ctx, p.conn, p.Relations, p.PageThreshold)
 	if err != nil {
-		err = fmt.Errorf("Error getting table to relinfos mapping: %v\n", err)
+		err = fmt.Errorf("error getting table to relinfos mapping: %v", err)
 		return
 	}
 
 	// Detect page size
-	p.page_size = pagecache.GetPageSize()
-	slog.Info("Detected Page size", "page_size", p.page_size)
+	p.pageSize = pagecache.GetPageSize()
+	slog.Info("Detected Page size", "pageSize", p.pageSize)
 
 	// Go through all tables and fill their pagecache
 	err = p.fillPartitionStats()
@@ -151,18 +155,18 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 		return
 	}
 
-	cached_memory, err := meminfo.GetCachedMemory(p.page_size)
+	cachedMemory, err := meminfo.GetCachedMemory(p.pageSize)
 	if err != nil {
 		return fmt.Errorf("Couldn't get cached_memory: %v", err)
 	}
-	slog.Info("Detected cached memory usage", "cached_memory", cached_memory)
+	slog.Info("Detected cached memory usage", "cached_memory", cachedMemory)
 
-	shared_buffers, err := p.getSharedBuffers(ctx, p.conn)
+	sharedBuffers, err := p.getSharedBuffers(ctx, p.conn)
 	if err != nil {
 		return fmt.Errorf("Couldn't get shared_buffers: %v", err)
 	}
-	slog.Info("Detected shared_buffers", "shared_buffers", shared_buffers)
-	p.file_memory = cached_memory - int64(shared_buffers)
+	slog.Info("Detected shared_buffers", "shared_buffers", sharedBuffers)
+	p.fileMemory = cachedMemory - int64(sharedBuffers)
 
 	// Filter partitions under the threshold
 	var filteredPartInfos []relation.PartInfo

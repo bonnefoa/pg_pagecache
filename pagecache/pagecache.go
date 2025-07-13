@@ -23,6 +23,7 @@ const (
 	KPF_HACKERS_BITS uint64 = 0xffff << 32
 )
 
+// PageCacheInfo stores page cache information
 type PageCacheInfo struct {
 	PageCached int
 	PageCount  int

@@ -13,6 +13,7 @@ var (
 	relationsFlag string
 )
 
+// CliArgs stores cli flag values
 type CliArgs struct {
 	PgData              string
 	Database            string
@@ -22,7 +23,7 @@ type CliArgs struct {
 	CachedPageThreshold int
 	Cpuprofile          string
 
-	FormatOptions
+	FormatFlags
 }
 
 func init() {
@@ -34,13 +35,14 @@ func init() {
 	flag.StringVar(&relationsFlag, "relations", "", "Filter on a specific relations (separated with commas)")
 }
 
+// ParseCliArgs returns a CliArgs with parsed values
 func ParseCliArgs() (CliArgs, error) {
 	flag.Parse()
 	err := SetLogLevel()
 	if err != nil {
 		return cliArgs, err
 	}
-	cliArgs.FormatOptions, err = ParseFormatOptions()
+	cliArgs.FormatFlags, err = ParseFormatOptions()
 	if err != nil {
 		return cliArgs, err
 	}

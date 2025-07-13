@@ -8,10 +8,14 @@ import (
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
+// FormatSort represents the different sort options
 type FormatSort int
+
+// FormatType represents the different type options
 type FormatType int
 
-type FormatOptions struct {
+// FormatFlags stores all format related flags
+type FormatFlags struct {
 	Unit        relation.FormatUnit
 	Limit       int
 	Type        FormatType
@@ -50,7 +54,7 @@ var (
 		"json":   FormatJson,
 	}
 
-	formatOptions   FormatOptions
+	formatFlags     FormatFlags
 	typeFlag        string
 	unitFlag        string
 	sortFlag        string
@@ -58,8 +62,8 @@ var (
 )
 
 func init() {
-	flag.IntVar(&formatOptions.Limit, "limit", -1, "Maximum number of results to format. -1 to format everything.")
-	flag.BoolVar(&formatOptions.NoHeader, "no_header", false, "Don't print header if true.")
+	flag.IntVar(&formatFlags.Limit, "limit", -1, "Maximum number of results to format. -1 to format everything.")
+	flag.BoolVar(&formatFlags.NoHeader, "no_header", false, "Don't print header if true.")
 	flag.StringVar(&typeFlag, "format", "column", "Output format to use. Can be csv, column or json")
 	flag.StringVar(&unitFlag, "unit", "page", "Unit to use for paeg count and page cached. Can be page, kb or MB")
 	flag.StringVar(&sortFlag, "sort", "pagecached", "Field to use for sort. Can be relation, pagecount or pagecached")
@@ -93,23 +97,23 @@ func parseTypeFlag(s string) (FormatType, error) {
 	return res, nil
 }
 
-func ParseFormatOptions() (FormatOptions, error) {
+func ParseFormatOptions() (FormatFlags, error) {
 	var err error
-	formatOptions.Sort, err = parseSort(sortFlag)
+	formatFlags.Sort, err = parseSort(sortFlag)
 	if err != nil {
-		return formatOptions, err
+		return formatFlags, err
 	}
-	formatOptions.Aggregation, err = relation.ParseAggregation(aggregationFlag)
+	formatFlags.Aggregation, err = relation.ParseAggregation(aggregationFlag)
 	if err != nil {
-		return formatOptions, err
+		return formatFlags, err
 	}
-	formatOptions.Unit, err = parseUnitFlag(unitFlag)
+	formatFlags.Unit, err = parseUnitFlag(unitFlag)
 	if err != nil {
-		return formatOptions, err
+		return formatFlags, err
 	}
-	formatOptions.Type, err = parseTypeFlag(typeFlag)
+	formatFlags.Type, err = parseTypeFlag(typeFlag)
 	if err != nil {
-		return formatOptions, err
+		return formatFlags, err
 	}
-	return formatOptions, err
+	return formatFlags, err
 }

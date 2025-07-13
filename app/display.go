@@ -11,7 +11,7 @@ import (
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
-func (p *PgPagecache) outputResults(outputInfos []relation.OutputInfo) error {
+func (p *PgPageCache) outputResults(outputInfos []relation.OutputInfo) error {
 	var values [][]string
 
 	header := relation.GetHeader(p.Aggregation)

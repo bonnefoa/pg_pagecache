@@ -1,4 +1,4 @@
-package pcstats
+package pagecache
 
 import (
 	"encoding/binary"
@@ -30,7 +30,7 @@ type PageCacheInfo struct {
 	PageFlags map[uint64]int
 }
 
-type PcState struct {
+type PageCacheState struct {
 	pagemapFile *os.File
 	kpageFlags  *os.File
 }
@@ -67,7 +67,7 @@ func GetPageSize() int64 {
 	return int64(os.Getpagesize())
 }
 
-func (p *PcState) getActivePages(pageCacheInfo *PageCacheInfo, mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
+func (p *PageCacheState) getActivePages(pageCacheInfo *PageCacheInfo, mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
 	ret, _, err := syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_RANDOM)
 	if ret != 0 {
 		return fmt.Errorf("syscall MADVISE failed: %v", err)
@@ -118,7 +118,7 @@ func (p *PcState) getActivePages(pageCacheInfo *PageCacheInfo, mmapPtr uintptr, 
 	return nil
 }
 
-func (p *PcState) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageCacheInfo, error) {
+func (p *PageCacheState) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageCacheInfo, error) {
 	var mmap []byte
 	pageCacheInfo := PageCacheInfo{0, 0, make(map[uint64]int, 0)}
 	// void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset);
@@ -164,25 +164,25 @@ func (p *PcState) getPagecacheStats(fd int, fileSize int64, pageSize int64) (Pag
 	return pageCacheInfo, nil
 }
 
-func NewPcState() (pcState PcState, err error) {
+func NewPageCacheState() (pageCacheState PageCacheState, err error) {
 	if runtime.GOOS != "linux" {
 		// Nothing to do
 		return
 	}
 
 	mode := os.FileMode(0600)
-	pcState.pagemapFile, err = os.OpenFile("/proc/self/pagemap", os.O_RDONLY, mode)
+	pageCacheState.pagemapFile, err = os.OpenFile("/proc/self/pagemap", os.O_RDONLY, mode)
 	if err != nil {
 		return
 	}
-	pcState.kpageFlags, err = os.OpenFile("/proc/kpageflags", os.O_RDONLY, mode)
+	pageCacheState.kpageFlags, err = os.OpenFile("/proc/kpageflags", os.O_RDONLY, mode)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func (p *PcState) GetPcStats(fullPath string, pagesize int64) (PageCacheInfo, error) {
+func (p *PageCacheState) GetPageCacheInfo(fullPath string, pagesize int64) (PageCacheInfo, error) {
 	pageCacheInfo := PageCacheInfo{0, 0, make(map[uint64]int, 0)}
 	file, err := os.Open(fullPath)
 	if err != nil {

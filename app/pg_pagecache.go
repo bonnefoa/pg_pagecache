@@ -10,25 +10,25 @@ import (
 	"log/slog"
 
 	"github.com/bonnefoa/pg_pagecache/meminfo"
-	"github.com/bonnefoa/pg_pagecache/pcstats"
+	"github.com/bonnefoa/pg_pagecache/pagecache"
 	"github.com/bonnefoa/pg_pagecache/relation"
 	"github.com/jackc/pgx/v5"
 )
 
-type PgPagecache struct {
+type PgPageCache struct {
 	CliArgs
 	conn *pgx.Conn
 
-	dbid        uint32
-	database    string
-	page_size   int64
-	file_memory int64 // Cache memory without shared_buffers
-	partitions  []relation.PartInfo
-	pcState     pcstats.PcState
+	dbid           uint32
+	database       string
+	page_size      int64
+	file_memory    int64 // Cache memory without shared_buffers
+	partitions     []relation.PartInfo
+	pageCacheState pagecache.PageCacheState
 }
 
 // getSharedBuffers returns the amount of shared_buffers memory in 4KB pages
-func (p *PgPagecache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (shared_buffers int, err error) {
+func (p *PgPageCache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (shared_buffers int, err error) {
 	row := conn.QueryRow(ctx, "SELECT setting::int FROM pg_settings where name='shared_buffers'")
 	err = row.Scan(&shared_buffers)
 
@@ -36,7 +36,7 @@ func (p *PgPagecache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (sha
 	return shared_buffers / 2, err
 }
 
-func (p *PgPagecache) fillRelinfoPcStats(relinfo *relation.RelInfo) (err error) {
+func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
 	baseDir := fmt.Sprintf("%s/base/%d", p.PgData, p.dbid)
 	segno := 0
 
@@ -56,7 +56,7 @@ func (p *PgPagecache) fillRelinfoPcStats(relinfo *relation.RelInfo) (err error) 
 			return
 		}
 
-		segmentPcStats, err := p.pcState.GetPcStats(fullPath, p.page_size)
+		segmentPcStats, err := p.pageCacheState.GetPageCacheInfo(fullPath, p.page_size)
 		if err != nil {
 			return err
 		}
@@ -64,11 +64,11 @@ func (p *PgPagecache) fillRelinfoPcStats(relinfo *relation.RelInfo) (err error) 
 	}
 }
 
-func (p *PgPagecache) fillTableStats(table *relation.TableInfo) error {
+func (p *PgPageCache) fillTableStats(table *relation.TableInfo) error {
 	var filteredRelinfo []relation.RelInfo
 
 	for _, relinfo := range table.RelInfos {
-		err := p.fillRelinfoPcStats(&relinfo)
+		err := p.fillRelinfo(&relinfo)
 		if err != nil {
 			return err
 		}
@@ -82,8 +82,8 @@ func (p *PgPagecache) fillTableStats(table *relation.TableInfo) error {
 	return nil
 }
 
-// fillPartitionPcStats iterate over tableToRelinfos and fetch page cache stats
-func (p *PgPagecache) fillPartitionPcStats() error {
+// fillPartitionStats iterate over tableToRelinfos and fetch page cache stats
+func (p *PgPageCache) fillPartitionStats() error {
 	for partName, partInfo := range p.partitions {
 		for tableName, tableInfo := range partInfo.TableInfos {
 			err := p.fillTableStats(&tableInfo)
@@ -99,15 +99,15 @@ func (p *PgPagecache) fillPartitionPcStats() error {
 	return nil
 }
 
-// NewPgPagecache fetches the active database id and name and creates the PgPagecache instance
-func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPagecache, err error) {
+// NewPgPagecache fetches the active database id and name and creates the pgPageCache instance
+func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPageCache, err error) {
 	pgPagecache.conn = conn
 	pgPagecache.CliArgs = cliArgs
-	pgPagecache.pcState, err = pcstats.NewPcState()
+	pgPagecache.pageCacheState, err = pagecache.NewPageCacheState()
 	return
 }
 
-func (p *PgPagecache) getOutputInfos() ([]relation.OutputInfo, error) {
+func (p *PgPageCache) getOutputInfos() ([]relation.OutputInfo, error) {
 	switch p.Aggregation {
 	case relation.AggNone:
 		return p.formatNoAggregation()
@@ -125,7 +125,7 @@ func (p *PgPagecache) getOutputInfos() ([]relation.OutputInfo, error) {
 	panic("Unreachable code")
 }
 
-func (p *PgPagecache) Run(ctx context.Context) (err error) {
+func (p *PgPageCache) Run(ctx context.Context) (err error) {
 	// Fetch dbid and database
 	err = p.conn.QueryRow(ctx, "select oid, datname from pg_database where datname=current_database()").Scan(&p.dbid, &p.database)
 	if err != nil {
@@ -142,11 +142,11 @@ func (p *PgPagecache) Run(ctx context.Context) (err error) {
 	}
 
 	// Detect page size
-	p.page_size = pcstats.GetPageSize()
+	p.page_size = pagecache.GetPageSize()
 	slog.Info("Detected Page size", "page_size", p.page_size)
 
-	// Go through all tables and fill their PcStats
-	err = p.fillPartitionPcStats()
+	// Go through all tables and fill their pagecache
+	err = p.fillPartitionStats()
 	if err != nil {
 		return
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 // formatAgggregated prints relations with their children
-func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInfo, err error) {
+func (p *PgPageCache) formatAggregatedTables() (outputInfos []relation.OutputInfo, err error) {
 	i := 0
 
 	var tableInfos []relation.TableInfo
@@ -44,7 +44,7 @@ func (p *PgPagecache) formatAggregatedTables() (outputInfos []relation.OutputInf
 	return
 }
 
-func (p *PgPagecache) formatAggregatePartitions() (outputInfos []relation.OutputInfo, err error) {
+func (p *PgPageCache) formatAggregatePartitions() (outputInfos []relation.OutputInfo, err error) {
 	p.sortPartInfos(p.partitions)
 
 	total := relation.TotalInfo

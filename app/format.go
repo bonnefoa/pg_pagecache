@@ -7,7 +7,7 @@ import (
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
-func (p *PgPagecache) sortPartInfos(r []relation.PartInfo) {
+func (p *PgPageCache) sortPartInfos(r []relation.PartInfo) {
 	slices.SortFunc(r, func(a, b relation.PartInfo) int {
 		switch p.Sort {
 		case SortPageCount:
@@ -19,7 +19,7 @@ func (p *PgPagecache) sortPartInfos(r []relation.PartInfo) {
 	})
 }
 
-func (p *PgPagecache) sortTableInfos(r []relation.TableInfo) {
+func (p *PgPageCache) sortTableInfos(r []relation.TableInfo) {
 	slices.SortFunc(r, func(a, b relation.TableInfo) int {
 		switch p.Sort {
 		case SortPageCount:
@@ -31,7 +31,7 @@ func (p *PgPagecache) sortTableInfos(r []relation.TableInfo) {
 	})
 }
 
-func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
+func (p *PgPageCache) sortRelInfos(r []relation.RelInfo) {
 	slices.SortFunc(r, func(a, b relation.RelInfo) int {
 		switch p.Sort {
 		case SortPageCount:
@@ -43,7 +43,7 @@ func (p *PgPagecache) sortRelInfos(r []relation.RelInfo) {
 	})
 }
 
-func (p *PgPagecache) formatNoAggregation() (outputInfos []relation.OutputInfo, err error) {
+func (p *PgPageCache) formatNoAggregation() (outputInfos []relation.OutputInfo, err error) {
 	var relinfos []relation.RelInfo
 	for _, partInfo := range p.partitions {
 		for _, tableInfo := range partInfo.TableInfos {

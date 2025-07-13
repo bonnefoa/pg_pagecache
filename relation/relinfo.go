@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bonnefoa/pg_pagecache/pcstats"
+	"github.com/bonnefoa/pg_pagecache/pagecache"
 )
 
 type AggregationType int
@@ -25,7 +25,7 @@ type OutputInfo interface {
 
 type BaseInfo struct {
 	Name string
-	pcstats.PageCacheInfo
+	pagecache.PageCacheInfo
 	Kind rune
 }
 
@@ -190,22 +190,22 @@ func pageFlagToString(f uint64) string {
 	}
 
 	res := strings.Builder{}
-	if f&pcstats.KPF_REFERENCED > 0 {
+	if f&pagecache.KPF_REFERENCED > 0 {
 		res.WriteString("referenced,")
 	}
-	if f&pcstats.KPF_UPTODATE > 0 {
+	if f&pagecache.KPF_UPTODATE > 0 {
 		res.WriteString("uptodate,")
 	}
-	if f&pcstats.KPF_DIRTY > 0 {
+	if f&pagecache.KPF_DIRTY > 0 {
 		res.WriteString("dirty,")
 	}
-	if f&pcstats.KPF_LRU > 0 {
+	if f&pagecache.KPF_LRU > 0 {
 		res.WriteString("lru,")
 	}
-	if f&pcstats.KPF_ACTIVE > 0 {
+	if f&pagecache.KPF_ACTIVE > 0 {
 		res.WriteString("active,")
 	}
-	if f&pcstats.KPF_WRITEBACK > 0 {
+	if f&pagecache.KPF_WRITEBACK > 0 {
 		res.WriteString("writeback,")
 	}
 

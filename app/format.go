@@ -58,7 +58,7 @@ func (p *PgPageCache) formatNoAggregation() (outputInfos []relation.OutputInfo, 
 			break
 		}
 		outputInfos = append(outputInfos, &relinfo)
-		total.Add(relinfo.PageCacheInfo)
+		total.Add(relinfo.PageStats)
 	}
 	outputInfos = append(outputInfos, &total)
 	return

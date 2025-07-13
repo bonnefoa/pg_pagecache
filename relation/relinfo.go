@@ -25,7 +25,7 @@ type OutputInfo interface {
 
 type BaseInfo struct {
 	Name string
-	pagecache.PageCacheInfo
+	pagecache.PageStats
 	Kind rune
 }
 
@@ -213,12 +213,12 @@ func pageFlagToString(f uint64) string {
 }
 
 func (r *RelInfo) ToFlagDetails() [][]string {
-	if r.PageCacheInfo.PageFlags == nil {
+	if r.PageStats.PageFlags == nil {
 		return nil
 	}
 
 	var res [][]string
-	for flag, count := range r.PageCacheInfo.PageFlags {
+	for flag, count := range r.PageStats.PageFlags {
 		res = append(res, []string{
 			r.Name, fmt.Sprintf("0x%016x", flag), pageFlagToString(flag), fmt.Sprintf("%d", count)})
 	}

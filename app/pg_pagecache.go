@@ -25,7 +25,7 @@ type PgPageCache struct {
 	pageSize       int64
 	fileMemory     int64 // Cache memory without shared_buffers
 	partitions     []relation.PartInfo
-	pageCacheState pagecache.PageCacheState
+	pageCacheState pagecache.State
 }
 
 // getSharedBuffers returns the amount of shared_buffers memory in 4KB pages
@@ -76,7 +76,7 @@ func (p *PgPageCache) fillTableStats(table *relation.TableInfo) error {
 		if relinfo.PageCached >= p.CachedPageThreshold {
 			filteredRelinfo = append(filteredRelinfo, relinfo)
 		}
-		table.Add(relinfo.PageCacheInfo)
+		table.Add(relinfo.PageStats)
 	}
 	table.RelInfos = filteredRelinfo
 
@@ -91,7 +91,7 @@ func (p *PgPageCache) fillPartitionStats() error {
 			if err != nil {
 				return err
 			}
-			partInfo.Add(tableInfo.PageCacheInfo)
+			partInfo.Add(tableInfo.PageStats)
 			partInfo.TableInfos[tableName] = tableInfo
 		}
 		p.partitions[partName] = partInfo

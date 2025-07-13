@@ -175,6 +175,7 @@ func (p *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 	return pageStats, nil
 }
 
+// NewPageCacheState creates a new pagecache state
 func NewPageCacheState() (state State, err error) {
 	if runtime.GOOS != "linux" {
 		// Nothing to do
@@ -193,6 +194,7 @@ func NewPageCacheState() (state State, err error) {
 	return
 }
 
+// GetPageCacheInfo returns the page cache stats for the provided file
 func (p *State) GetPageCacheInfo(fullPath string, pagesize int64) (PageStats, error) {
 	pageStats := PageStats{0, 0, make(map[uint64]int, 0)}
 	file, err := os.Open(fullPath)

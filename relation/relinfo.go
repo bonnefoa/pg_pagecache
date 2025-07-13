@@ -8,38 +8,50 @@ import (
 	"github.com/bonnefoa/pg_pagecache/pagecache"
 )
 
+// AggregationType represents the different types of aggregation
 type AggregationType int
 
 const (
+	// AggNone outputs all relations (table, indexes, toast tables, toast indexes...) at the same level
 	AggNone AggregationType = iota
+	// AggTable groups relations with their indexes, toast and toast index
 	AggTable
+	// AggTableOnly aggregates results per parent relation with summed stats
 	AggTableOnly
+	// AggPartition aggregates partitions together
 	AggPartition
+	// AggPartitionOnly only display the parent partition with summed stats
 	AggPartitionOnly
 )
 
+// OutputInfo represents an element that can will generate an output
 type OutputInfo interface {
 	ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string
 	ToFlagDetails() [][]string
 }
 
+// BaseInfo contains informations shared by everyone (relation, partition, table...)
+// with page cache stats, a name and a kind
 type BaseInfo struct {
-	Name string
 	pagecache.PageStats
+	Name string
 	Kind rune
 }
 
+// PartInfo represents the parent partition with its children
 type PartInfo struct {
 	BaseInfo
 	TableInfos map[string]TableInfo
 }
 
+// TableInfo represents a relation with its indexes, toast table and toast table index
 type TableInfo struct {
 	BaseInfo
 	Partition string
 	RelInfos  []RelInfo
 }
 
+// RelInfo represents a relation, which can be anything from pg_class: a relation, an index, a toast table...
 type RelInfo struct {
 	BaseInfo
 	Partition   string
@@ -47,9 +59,11 @@ type RelInfo struct {
 	Relfilenode uint32
 }
 
+// FormatUnit represents the unit used for output
 type FormatUnit int
 
 var (
+	// TotalInfo stores the sum of all page stats. Used to display the last sum line.
 	TotalInfo = BaseInfo{Name: "Total", Kind: 'S'}
 
 	formatAggregationMap = map[string]AggregationType{
@@ -62,9 +76,13 @@ var (
 )
 
 const (
+	// UnitPage outputs values in pages
 	UnitPage FormatUnit = iota
+	// UnitKB outputs values in KB
 	UnitKB
+	// UnitMB outputs values in MB
 	UnitMB
+	// UnitGB outputs values in GB
 	UnitGB
 
 	kebibyte = float64(1 << 10)
@@ -86,15 +104,17 @@ func unitToString(u FormatUnit) string {
 	return "?"
 }
 
+// ParseAggregation parses the aggregation flag
 func ParseAggregation(s string) (AggregationType, error) {
 	agg, ok := formatAggregationMap[strings.ToLower(s)]
 	if !ok {
-		err := fmt.Errorf("Unknown aggregation: %v\n", s)
+		err := fmt.Errorf("unknown aggregation: %v", s)
 		return agg, err
 	}
 	return agg, nil
 }
 
+// GetHeader returns the output's header
 func GetHeader(agg AggregationType) []string {
 	var res []string
 
@@ -144,6 +164,7 @@ func adjustLine(agg AggregationType, line []string) []string {
 	return line
 }
 
+// ToStringArray outputs baseInfo's information
 func (r *BaseInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string {
 	res := []string{"", "", r.Name, kindToString(r.Kind), "",
 		formatValue(r.PageCached, unit, pageSize),
@@ -153,6 +174,7 @@ func (r *BaseInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize 
 	return adjustLine(agg, res)
 }
 
+// ToStringArray outputs relInfo's information
 func (r *RelInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string {
 	res := []string{r.Partition, r.Table, r.Name, kindToString(r.Kind), fmt.Sprintf("%d", r.Relfilenode),
 		formatValue(r.PageCached, unit, pageSize),
@@ -162,6 +184,7 @@ func (r *RelInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize i
 	return adjustLine(agg, res)
 }
 
+// ToStringArray outputs tableInfo's information
 func (t *TableInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string {
 	res := []string{t.Partition, t.Name, "", kindToString(t.Kind), "",
 		formatValue(t.PageCached, unit, pageSize),
@@ -171,6 +194,7 @@ func (t *TableInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize
 	return adjustLine(agg, res)
 }
 
+// ToStringArray outputs partInfo's information
 func (p *PartInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize int64, fileMemory int64) []string {
 	res := []string{p.Name, "", "", kindToString(p.Kind), "",
 		formatValue(p.PageCached, unit, pageSize),
@@ -180,6 +204,7 @@ func (p *PartInfo) ToStringArray(agg AggregationType, unit FormatUnit, pageSize 
 	return adjustLine(agg, res)
 }
 
+// ToFlagDetails outputs page cache flags details
 func (r *BaseInfo) ToFlagDetails() [][]string {
 	return nil
 }
@@ -212,6 +237,7 @@ func pageFlagToString(f uint64) string {
 	return strings.Trim(res.String(), ",")
 }
 
+// ToFlagDetails outputs page cache flags details
 func (r *RelInfo) ToFlagDetails() [][]string {
 	if r.PageStats.PageFlags == nil {
 		return nil
@@ -226,10 +252,12 @@ func (r *RelInfo) ToFlagDetails() [][]string {
 	return res
 }
 
-func (r *TableInfo) ToFlagDetails() [][]string {
+// ToFlagDetails outputs page cache flags details
+func (t *TableInfo) ToFlagDetails() [][]string {
 	return nil
 }
 
-func (r *PartInfo) ToFlagDetails() [][]string {
+// ToFlagDetails outputs page cache flags details
+func (p *PartInfo) ToFlagDetails() [][]string {
 	return nil
 }

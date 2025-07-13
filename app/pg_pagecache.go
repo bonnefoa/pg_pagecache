@@ -101,10 +101,10 @@ func (p *PgPageCache) fillPartitionStats() error {
 }
 
 // NewPgPagecache fetches the active database id and name and creates the pgPageCache instance
-func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPageCache, err error) {
+func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPageCache) {
 	pgPagecache.conn = conn
 	pgPagecache.CliArgs = cliArgs
-	pgPagecache.pageCacheState, err = pagecache.NewPageCacheState()
+	pgPagecache.pageCacheState = pagecache.NewPageCacheState()
 	return
 }
 

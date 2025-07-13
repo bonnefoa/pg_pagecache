@@ -62,11 +62,7 @@ func main() {
 	defer conn.Close(ctx)
 
 	// Build PgPagecache struct
-	pgPagecache, err := app.NewPgPagecache(conn, cliArgs)
-	if err != nil {
-		slog.Error("New PgPagecache error", "error", err)
-		os.Exit(1)
-	}
+	pgPagecache := app.NewPgPagecache(conn, cliArgs)
 
 	// Run it
 	err = pgPagecache.Run(ctx)

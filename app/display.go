@@ -11,6 +11,42 @@ import (
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
+func (p *PgPageCache) outputColumns(values [][]string, outputInfos []relation.OutputInfo) {
+	w := tabwriter.NewWriter(os.Stdout, 14, 0, 1, ' ', 0)
+	for _, v := range values {
+		fmt.Fprintln(w, strings.Join(v, "\t"))
+	}
+	w.Flush()
+
+	if p.pageCacheState.CanReadPageFlags() {
+		fmt.Printf("\nPage Flags\n")
+		fmt.Fprintln(w, strings.Join([]string{"Relation", "Flags", "Symbolic Flags", "Count"}, "\t"))
+		for _, v := range outputInfos {
+			for _, flag := range v.ToFlagDetails() {
+				fmt.Fprintln(w, strings.Join(flag, "\t"))
+			}
+		}
+		w.Flush()
+	}
+}
+
+func (p *PgPageCache) outputJSON(header []string, values [][]string) error {
+	m := make([]map[string]string, 0)
+	for _, line := range values {
+		o := make(map[string]string, 0)
+		for i, k := range header {
+			o[k] = line[i]
+		}
+		m = append(m, o)
+	}
+	res, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	fmt.Print(string(res))
+	return nil
+}
+
 func (p *PgPageCache) outputResults(outputInfos []relation.OutputInfo) error {
 	var values [][]string
 
@@ -30,35 +66,9 @@ func (p *PgPageCache) outputResults(outputInfos []relation.OutputInfo) error {
 		w.WriteAll(values)
 		return w.Error()
 	case FormatJSON:
-		m := make([]map[string]string, 0)
-		for _, line := range values {
-			o := make(map[string]string, 0)
-			for i, k := range header {
-				o[k] = line[i]
-			}
-			m = append(m, o)
-		}
-		res, err := json.Marshal(m)
-		if err != nil {
-			return err
-		}
-		fmt.Print(string(res))
+		return p.outputJSON(header, values)
 	case FormatColumn:
-		w := tabwriter.NewWriter(os.Stdout, 14, 0, 1, ' ', 0)
-		for _, v := range values {
-			fmt.Fprintln(w, strings.Join(v, "\t"))
-		}
-		w.Flush()
-
-		fmt.Printf("\nPage Flags\n")
-		fmt.Fprintln(w, strings.Join([]string{"Relation", "Flags", "Symbolic Flags", "Count"}, "\t"))
-		for _, v := range outputInfos {
-			for _, flag := range v.ToFlagDetails() {
-				fmt.Fprintln(w, strings.Join(flag, "\t"))
-			}
-		}
-		w.Flush()
-
+		p.outputColumns(values, outputInfos)
 	}
 	return nil
 }

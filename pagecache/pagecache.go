@@ -2,6 +2,7 @@ package pagecache
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 	"strconv"
@@ -129,6 +130,14 @@ func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePt
 	return nil
 }
 
+// CanReadPageFlags returns true if page cache flags are readable
+func (p *State) CanReadPageFlags() bool {
+	if runtime.GOOS == "linux" && p.kpageFlagsFile != nil {
+		return true
+	}
+	return false
+}
+
 func (p *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageStats, error) {
 	var mmap []byte
 	pageStats := PageStats{0, 0, make(map[uint64]int, 0)}
@@ -141,7 +150,6 @@ func (p *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 
 	// Mincore signature:
 	// int mincore(void addr[.length], size_t length, unsigned char *vec);
-
 	// Build the result vec. From mincore doc: The vec argument must point to an
 	// array containing at least (length+PAGE_SIZE-1) / PAGE_SIZE bytes
 	pageNumber := (fileSize + pageSize - 1) / pageSize
@@ -165,7 +173,7 @@ func (p *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 		}
 	}
 
-	if runtime.GOOS == "linux" {
+	if p.CanReadPageFlags() {
 		err = p.getActivePages(&pageStats, mmapPtr, fileSizePtr, vec, pageSize)
 		if err != nil {
 			return pageStats, err
@@ -176,19 +184,23 @@ func (p *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 }
 
 // NewPageCacheState creates a new pagecache state
-func NewPageCacheState() (state State, err error) {
+func NewPageCacheState() (state State) {
 	if runtime.GOOS != "linux" {
 		// Nothing to do
 		return
 	}
 
+	var err error
 	mode := os.FileMode(0600)
 	state.pagemapFile, err = os.OpenFile("/proc/self/pagemap", os.O_RDONLY, mode)
 	if err != nil {
+		slog.Info("Error opening /proc/self/pagemap, page flags won't be available", "err", err)
 		return
 	}
 	state.kpageFlagsFile, err = os.OpenFile("/proc/kpageflags", os.O_RDONLY, mode)
 	if err != nil {
+		state.pagemapFile = nil
+		slog.Info("Error opening /proc/kpageflags, page flags won't be available", "err", err)
 		return
 	}
 	return

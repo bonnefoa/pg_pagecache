@@ -12,6 +12,16 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type QueryTracer struct{}
+
+func (q QueryTracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	slog.Debug("Running query", "SQL", data.SQL)
+	return ctx
+}
+
+func (q QueryTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
+}
+
 func main() {
 	ctx := context.Background()
 	flag.Parse()
@@ -38,7 +48,13 @@ func main() {
 	}
 
 	// Get the db connection
-	conn, err := pgx.Connect(ctx, cliArgs.ConnectString)
+	config, err := pgx.ParseConfig(cliArgs.ConnectString)
+	if err != nil {
+		slog.Error("Error parsing connection string", "error", err)
+		os.Exit(1)
+	}
+	config.Tracer = QueryTracer{}
+	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
 		slog.Error("Unable to connect to database", "error", err)
 		os.Exit(1)

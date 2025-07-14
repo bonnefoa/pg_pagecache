@@ -18,7 +18,8 @@ builds:
 
 archives:
   - formats: [tar.gz]
-    name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}'
+    name_template: >-
+      {{- .ProjectName }}-v{{- .Version }}-{{ .Os }}-{{- if eq .Arch "amd64" }}x86_64{{- else }}{{ .Arch }}{{ end }}
 
 changelog:
   sort: asc

@@ -108,22 +108,14 @@ func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPageCache) {
 	return
 }
 
-func (p *PgPageCache) getOutputInfos() ([]relation.OutputInfo, error) {
-	switch p.Aggregation {
-	case relation.AggNone:
-		return p.formatNoAggregation()
-
-	case relation.AggPartition:
-		fallthrough
-	case relation.AggPartitionOnly:
-		return p.formatAggregatePartitions()
-
-	case relation.AggTable:
-		fallthrough
-	case relation.AggTableOnly:
-		return p.formatAggregatedTables()
+func (p *PgPageCache) getOutputInfos() []relation.OutputInfo {
+	if p.GroupPartition {
+		return p.getAggregatedPartitions()
 	}
-	panic("Unreachable code")
+	if p.GroupTable {
+		return p.getAggregatedTables()
+	}
+	return p.getNoAggregations()
 }
 
 // Run executes the pg_pagecache. It will fetch database and relation
@@ -198,9 +190,6 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 		}
 	}
 
-	outputInfos, err := p.getOutputInfos()
-	if err != nil {
-		return err
-	}
+	outputInfos := p.getOutputInfos()
 	return p.outputResults(outputInfos)
 }

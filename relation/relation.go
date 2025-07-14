@@ -14,7 +14,7 @@ import (
 // GetPartitionToTables returns the mapping between a parent partition and its children
 // Child includes toast table, toast table index and all indexes of the parent relation
 func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (partInfos []PartInfo, err error) {
-	rows, err := conn.Query(ctx, `SELECT COALESCE(parent_idx.relname, parent.relname, 'No Partition'), COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
+	rows, err := conn.Query(ctx, `SELECT COALESCE(parent_idx.relname, parent.relname, 'No partition'), COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 		FROM pg_class C
 		LEFT JOIN pg_index ON pg_index.indexrelid = C.oid
 		-- index to parent table

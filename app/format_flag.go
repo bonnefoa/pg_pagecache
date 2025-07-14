@@ -16,12 +16,13 @@ type FormatType int
 
 // FormatFlags stores all format related flags
 type FormatFlags struct {
-	Unit        relation.FormatUnit
-	Limit       int
-	Type        FormatType
-	Sort        FormatSort
-	NoHeader    bool
-	Aggregation relation.AggregationType
+	Unit           relation.FormatUnit
+	Limit          int
+	Type           FormatType
+	Sort           FormatSort
+	NoHeader       bool
+	GroupTable     bool
+	GroupPartition bool
 }
 
 const (
@@ -69,7 +70,9 @@ var (
 
 func init() {
 	flag.IntVar(&formatFlags.Limit, "limit", -1, "Maximum number of results to format. -1 to format everything.")
-	flag.BoolVar(&formatFlags.NoHeader, "no_header", false, "Don't print header if true.")
+	flag.BoolVar(&formatFlags.NoHeader, "no_header", false, "Don't print header.")
+	flag.BoolVar(&formatFlags.GroupPartition, "group_partition", false, "Group partition.")
+	flag.BoolVar(&formatFlags.GroupTable, "group_table", false, "Group indexes, toast with owning relation.")
 	flag.StringVar(&typeFlag, "format", "column", "Output format to use. Can be csv, column or json")
 	flag.StringVar(&unitFlag, "unit", "page", "Unit to use for paeg count and page cached. Can be page, kb or MB")
 	flag.StringVar(&sortFlag, "sort", "pagecached", "Field to use for sort. Can be relation, pagecount or pagecached")
@@ -107,10 +110,6 @@ func parseTypeFlag(s string) (FormatType, error) {
 func ParseFormatOptions() (FormatFlags, error) {
 	var err error
 	formatFlags.Sort, err = parseSort(sortFlag)
-	if err != nil {
-		return formatFlags, err
-	}
-	formatFlags.Aggregation, err = relation.ParseAggregation(aggregationFlag)
 	if err != nil {
 		return formatFlags, err
 	}

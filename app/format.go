@@ -43,7 +43,7 @@ func (p *PgPageCache) sortRelInfos(r []relation.RelInfo) {
 	})
 }
 
-func (p *PgPageCache) formatNoAggregation() (outputInfos []relation.OutputInfo, err error) {
+func (p *PgPageCache) getNoAggregations() (outputInfos []relation.OutputInfo) {
 	var relinfos []relation.RelInfo
 	for _, partInfo := range p.partitions {
 		for _, tableInfo := range partInfo.TableInfos {

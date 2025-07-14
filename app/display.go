@@ -20,7 +20,7 @@ func (p *PgPageCache) outputColumns(values [][]string, outputInfos []relation.Ou
 
 	if p.pageCacheState.CanReadPageFlags() {
 		fmt.Printf("\nPage Flags\n")
-		fmt.Fprintln(w, strings.Join([]string{"Relation", "Flags", "Symbolic Flags", "Count"}, "\t"))
+		fmt.Fprintln(w, strings.Join([]string{"Relation", "Page Count", "Flags", "Symbolic Flags", "Long Symbolic Flags"}, "\t"))
 		for _, v := range outputInfos {
 			for _, flag := range v.ToFlagDetails() {
 				fmt.Fprintln(w, strings.Join(flag, "\t"))

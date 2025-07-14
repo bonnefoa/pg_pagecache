@@ -209,34 +209,6 @@ func (r *BaseInfo) ToFlagDetails() [][]string {
 	return nil
 }
 
-func pageFlagToString(f uint64) string {
-	if f == 0 {
-		return ""
-	}
-
-	res := strings.Builder{}
-	if f&pagecache.KpfReferenced > 0 {
-		res.WriteString("referenced,")
-	}
-	if f&pagecache.KpfUptodate > 0 {
-		res.WriteString("uptodate,")
-	}
-	if f&pagecache.KpfDirty > 0 {
-		res.WriteString("dirty,")
-	}
-	if f&pagecache.KpfLRU > 0 {
-		res.WriteString("lru,")
-	}
-	if f&pagecache.KpfActive > 0 {
-		res.WriteString("active,")
-	}
-	if f&pagecache.KpfWriteback > 0 {
-		res.WriteString("writeback,")
-	}
-
-	return strings.Trim(res.String(), ",")
-}
-
 // ToFlagDetails outputs page cache flags details
 func (r *RelInfo) ToFlagDetails() [][]string {
 	if r.PageStats.PageFlags == nil {
@@ -244,9 +216,10 @@ func (r *RelInfo) ToFlagDetails() [][]string {
 	}
 
 	var res [][]string
-	for flag, count := range r.PageStats.PageFlags {
+	for flags, count := range r.PageStats.PageFlags {
 		res = append(res, []string{
-			r.Name, fmt.Sprintf("0x%016x", flag), pageFlagToString(flag), fmt.Sprintf("%d", count)})
+			r.Name, fmt.Sprintf("%d", count), fmt.Sprintf("0x%016x", flags),
+			pagecache.PageFlagShortName(flags), pagecache.PageFlagLongName(flags)})
 	}
 
 	return res

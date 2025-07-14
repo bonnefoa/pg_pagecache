@@ -13,17 +13,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Kernel Page cache flags
-const (
-	KpfReferenced        = 1 << 2
-	KpfUptodate          = 1 << 3
-	KpfDirty             = 1 << 4
-	KpfLRU               = 1 << 5
-	KpfActive            = 1 << 6
-	KpfWriteback         = 1 << 8
-	KpfHackerBits uint64 = 0xffff << 32
-)
-
 // PageStats stores page cache information
 type PageStats struct {
 	PageCached int
@@ -114,17 +103,18 @@ func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePt
 		return fmt.Errorf("error reading pagemap flags: %v", err)
 	}
 
-	for _, f := range pagemapFlags {
-		pfn := f & 0x7FFFFFFFFFFFFF
+	for _, pme := range pagemapFlags {
+		pfn := pme & 0x7FFFFFFFFFFFFF
 		if pfn == 0 {
 			continue
 		}
 
-		flags, err := readInt64SliceFromFile(p.kpageFlagsFile, 1, int64(pfn))
+		flagSlice, err := readInt64SliceFromFile(p.kpageFlagsFile, 1, int64(pfn))
 		if err != nil {
 			return err
 		}
-		pageStats.PageFlags[flags[0]]++
+		flags := expandOverloadedFlags(flagSlice[0], pme)
+		pageStats.PageFlags[flags]++
 	}
 
 	return nil

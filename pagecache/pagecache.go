@@ -79,7 +79,7 @@ func readInt64SliceFromFile(f *os.File, size int, index int64) ([]uint64, error)
 	return unsafe.Slice(ui64Ptr, ui64Len), nil
 }
 
-func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
+func (s *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
 	ret, _, err := syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_RANDOM)
 	if ret != 0 {
 		return fmt.Errorf("syscall MADVISE failed: %v", err)
@@ -99,7 +99,7 @@ func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePt
 
 	numPages := len(vec)
 	indexPages := (int64(mmapPtr) / pageSize)
-	pagemapFlags, err := readInt64SliceFromFile(p.pagemapFile, numPages, indexPages)
+	pagemapFlags, err := readInt64SliceFromFile(s.pagemapFile, numPages, indexPages)
 	if err != nil {
 		return fmt.Errorf("error reading pagemap flags: %v", err)
 	}
@@ -110,12 +110,12 @@ func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePt
 			continue
 		}
 
-		flagSlice, err := readInt64SliceFromFile(p.kpageFlagsFile, 1, int64(pfn))
+		flagSlice, err := readInt64SliceFromFile(s.kpageFlagsFile, 1, int64(pfn))
 		if err != nil {
 			return err
 		}
 		var flags uint64
-		if p.rawFlags {
+		if s.rawFlags {
 			flags = expandOverloadedFlags(flagSlice[0], pme)
 		} else {
 			flags = wellKnownFlags(flagSlice[0])
@@ -127,14 +127,14 @@ func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePt
 }
 
 // CanReadPageFlags returns true if page cache flags are readable
-func (p *State) CanReadPageFlags() bool {
-	if runtime.GOOS == "linux" && p.kpageFlagsFile != nil {
+func (s *State) CanReadPageFlags() bool {
+	if runtime.GOOS == "linux" && s.kpageFlagsFile != nil {
 		return true
 	}
 	return false
 }
 
-func (p *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageStats, error) {
+func (s *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageStats, error) {
 	var mmap []byte
 	pageStats := PageStats{0, 0, make(map[uint64]int, 0)}
 	// void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset);
@@ -169,8 +169,8 @@ func (p *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 		}
 	}
 
-	if p.CanReadPageFlags() {
-		err = p.getActivePages(&pageStats, mmapPtr, fileSizePtr, vec, pageSize)
+	if s.CanReadPageFlags() {
+		err = s.getActivePages(&pageStats, mmapPtr, fileSizePtr, vec, pageSize)
 		if err != nil {
 			return pageStats, err
 		}
@@ -204,7 +204,7 @@ func NewPageCacheState(rawFlags bool) (state State) {
 }
 
 // GetPageCacheInfo returns the page cache stats for the provided file
-func (p *State) GetPageCacheInfo(fullPath string, pagesize int64) (PageStats, error) {
+func (s *State) GetPageCacheInfo(fullPath string, pagesize int64) (PageStats, error) {
 	pageStats := PageStats{0, 0, make(map[uint64]int, 0)}
 	file, err := os.Open(fullPath)
 	if err != nil {
@@ -219,7 +219,7 @@ func (p *State) GetPageCacheInfo(fullPath string, pagesize int64) (PageStats, er
 	if fileSize == 0 {
 		return pageStats, nil
 	}
-	pageStats, err = p.getPagecacheStats(int(file.Fd()), fileInfo.Size(), pagesize)
+	pageStats, err = s.getPagecacheStats(int(file.Fd()), fileInfo.Size(), pagesize)
 	if err != nil {
 		return pageStats, fmt.Errorf("Getting pagecache stats for %s failed: %v", fullPath, err)
 	}

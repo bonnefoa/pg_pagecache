@@ -17,7 +17,7 @@ builds:
       - 7
 
 archives:
-  - formats: [tar.gz]
+  - formats: ["binary"]
     name_template: >-
       {{- .ProjectName }}-v{{- .Version }}-{{ .Os }}-{{- if eq .Arch "amd64" }}x86_64{{- else }}{{ .Arch }}{{ end }}
 

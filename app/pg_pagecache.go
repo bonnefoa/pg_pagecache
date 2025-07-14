@@ -104,7 +104,7 @@ func (p *PgPageCache) fillPartitionStats() error {
 func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPageCache) {
 	pgPagecache.conn = conn
 	pgPagecache.CliArgs = cliArgs
-	pgPagecache.pageCacheState = pagecache.NewPageCacheState()
+	pgPagecache.pageCacheState = pagecache.NewPageCacheState(cliArgs.RawFlags)
 	return
 }
 

@@ -58,6 +58,8 @@ const (
 	kpfSwap          = 62
 	kpfMmapExclusive = 63
 
+	kpfHackersBits uint64 = 0xffff << 32
+
 	pmSoftDirty     = 1 << 55
 	pmMmapExclusive = 1 << 56
 	pmFile          = 1 << 61
@@ -149,6 +151,19 @@ func expandOverloadedFlags(flags uint64, pme uint64) uint64 {
 	}
 	if (pme & pmMmapExclusive) > 0 {
 		flags |= (1 << kpfMmapExclusive)
+	}
+
+	return flags
+}
+
+func wellKnownFlags(flags uint64) uint64 {
+	/* hide flags intended only for kernel hacker */
+	flags &= ^kpfHackersBits
+
+	/* hide non-hugeTLB compound pages */
+	bitsCompound := uint64((1 << kpfCompoundHead) | (1 << kpfCompoundTail))
+	if (flags&bitsCompound) > 0 && (flags&1<<kpfHuge) == 0 {
+		flags &= ^bitsCompound
 	}
 
 	return flags

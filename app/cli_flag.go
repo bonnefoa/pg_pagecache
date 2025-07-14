@@ -22,6 +22,7 @@ type CliArgs struct {
 	PageThreshold       int
 	CachedPageThreshold int
 	Cpuprofile          string
+	RawFlags            bool
 
 	FormatFlags
 }
@@ -33,6 +34,7 @@ func init() {
 	flag.IntVar(&cliArgs.CachedPageThreshold, "cached_page_threshold", 0, "Exclude relations with cached pages under the threshold. -1 to display everything")
 	flag.StringVar(&cliArgs.Cpuprofile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&relationsFlag, "relations", "", "Filter on a specific relations (separated with commas)")
+	flag.BoolVar(&cliArgs.RawFlags, "raw_flags", false, "Raw flag mode")
 }
 
 // ParseCliArgs returns a CliArgs with parsed values

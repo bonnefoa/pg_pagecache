@@ -23,6 +23,7 @@ type PageStats struct {
 
 // State stores state for page cache related functions
 type State struct {
+	rawFlags       bool
 	pagemapFile    *os.File
 	kpageFlagsFile *os.File
 }
@@ -113,7 +114,12 @@ func (p *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePt
 		if err != nil {
 			return err
 		}
-		flags := expandOverloadedFlags(flagSlice[0], pme)
+		var flags uint64
+		if p.rawFlags {
+			flags = expandOverloadedFlags(flagSlice[0], pme)
+		} else {
+			flags = wellKnownFlags(flagSlice[0])
+		}
 		pageStats.PageFlags[flags]++
 	}
 
@@ -174,7 +180,8 @@ func (p *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 }
 
 // NewPageCacheState creates a new pagecache state
-func NewPageCacheState() (state State) {
+func NewPageCacheState(rawFlags bool) (state State) {
+	state.rawFlags = rawFlags
 	if runtime.GOOS != "linux" {
 		// Nothing to do
 		return

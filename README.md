@@ -1,47 +1,71 @@
 ## pg_pagecache
 
-pg_pagecache shows the pagecache usage of PostgreSQL's relation files.
+`pg_pagecache` shows page cache statistics of PostgreSQL's relation files.
 
 It will:
 - Connect to the database to fetch relation informations from `pg_class` and `pg_index`
-- Iterate over `$PGDATA/base/$DBID` files with mincore to get pagecache usage
+- Iterate over relation files with `mincore` to get how many pages are cached
+- If readable, it reads `/proc/kpageflages` to get page flags and display them (similar to `page-types`)
+
+## Installation
+
+Get the latest binary for your architecture:
+```
+tag=$(curl -s 'https://api.github.com/repos/bonnefoa/pg_pagecache/releases/latest' | sed -n 's/ *"name": "\(v[0-9]*.[0-9]*.[0-9]*\).*/\1/p')
+file="pg_pagecache-${tag}-$(uname)-$(uname -m)"
+wget "https://github.com/bonnefoa/pg_pagecache/releases/download/${tag}/${file}"
+chmod a+x ${file}
+```
 
 ## Usage
 
-Calling `pg_pagecache` without arguments will attempt to connect to the database using the standard `PGHOST`, `PGUSER` and `PGDATABASE` env vars. `PGDATA` will also be used to locate the relation files to scan.
+Calling `pg_pagecache` without arguments will attempt to connect to the database using the standard `PGHOST`, `PGUSER` and `PGDATABASE` env vars.
+`PGDATA` will also be used to locate the relation files to scan.
 
 ```
-pg_pagecache
+./pg_pagecache
 
-Relation                        Kind          PageCached    PageCount     %Cached       %Total
-pgbench_accounts_34             Relation      1124          12858         8.74          0.05
-pgbench_accounts_35             Relation      1043          12858         8.11          0.05
-pgbench_accounts_36             Relation      115           12858         0.89          0.01
-pg_class                        Relation      104           1258          8.27          0.00
-pg_attribute                    Relation      19            288           6.60          0.00
-pgbench_accounts_32             Relation      12            12858         0.09          0.00
-pg_amproc_fam_proc_index        Index         6             10            60.00         0.00
-pg_index_indexrelid_index       Index         6             8             75.00         0.00
+Partition     Table            Relation              Relfilenode   Kind          PageCached    PageCount     %Cached       %Total
+No partition  pgbench_accounts pgbench_accounts_pkey 33628         Index         552 Pgs       552 Pgs       100.00        0.03
+No partition  pgbench_branches pgbench_branches_pkey 33624         Index         4 Pgs         4 Pgs         100.00        0.00
+No partition  pgbench_tellers  pgbench_tellers_pkey  33626         Index         4 Pgs         4 Pgs         100.00        0.00
+No partition  pgbench_branches pgbench_branches      33621         Relation      2 Pgs         2 Pgs         100.00        0.00
+No partition  pgbench_tellers  pgbench_tellers       33623         Relation      2 Pgs         2 Pgs         100.00        0.00
+                               Total                               Total         564 Pgs       564 Pgs       100.00        0.03
 ```
 
-### Connect string 
+### Page Flags
 
-It's possible to override the connection string and pgdata location with `connect_str` and `pg_data` flags:
-
-```
-pg_pagecache -connect_str "database=postgres" -pg_data ~/var/lib/postgresql/pg_data
-```
-
-### Limit Scan
-
-On large databases, calling mincore can take time while not being very useful as you're likely mostly interested in top relations. You can use the `page_threshold` flag to only scan relations that have more pages (as reported by `pg_class`) than the provided threshold.
+If `/proc/kpageflages` is readable, page flags details will be displayed
 
 ```
-pg_pagecache -page_threshold 1000
+sudo ./pg_pagecache -connect_str "user=postgres database=postgres host=localhost" -pg_data ~/pg_data
+Partition     Table            Relation                  Relfilenode   Kind          PageCached    PageCount     %Cached       %Total
+No partition  pgbench_accounts pgbench_accounts_pkey     33628         Index         552 Pgs       552 Pgs       100.00        0.03
+No partition  pg_type          pg_type_oid_index         2703          Index         10 Pgs        18 Pgs        55.56         0.00
+No partition  pg_type          pg_type_typname_nsp_index 2704          Index         10 Pgs        26 Pgs        38.46         0.00
+No partition  pgbench_branches pgbench_branches_pkey     33624         Index         4 Pgs         4 Pgs         100.00        0.00
+No partition  pgbench_tellers  pgbench_tellers_pkey      33626         Index         4 Pgs         4 Pgs         100.00        0.00
+No partition  pg_statistic     pg_toast_2619             2840          TOAST         2 Pgs         16 Pgs        12.50         0.00
+No partition  pgbench_branches pgbench_branches          33621         Relation      2 Pgs         2 Pgs         100.00        0.00
+No partition  pgbench_tellers  pgbench_tellers           33623         Relation      2 Pgs         2 Pgs         100.00        0.00
+                               Total                                   Total         586 Pgs       624 Pgs       93.91         0.03
 
-Relation            Kind          PageCached    PageCount     %Cached       %Total
-pgbench_accounts_34 Relation      1124          12858         8.74          0.05
-pgbench_accounts_35 Relation      1043          12858         8.11          0.05
-pgbench_accounts_36 Relation      115           12858         0.89          0.01
-pgbench_accounts_32 Relation      12            12858         0.09          0.00
+Page Flags
+Relation                  Page Count    Flags              Symbolic Flags                                                   Long Symbolic Flags
+pgbench_accounts_pkey     550           0x0000000000000028 ___U_l__________________________________________________________ uptodate,lru
+pgbench_accounts_pkey     2             0x000000000000002c __RU_l__________________________________________________________ referenced,uptodate,lru
+pg_type_oid_index         10            0x000000000000002c __RU_l__________________________________________________________ referenced,uptodate,lru
+pg_type_typname_nsp_index 10            0x000000000000002c __RU_l__________________________________________________________ referenced,uptodate,lru
+pgbench_branches_pkey     4             0x0000000000000028 ___U_l__________________________________________________________ uptodate,lru
+pgbench_tellers_pkey      4             0x0000000000000028 ___U_l__________________________________________________________ uptodate,lru
+pg_toast_2619             2             0x000000000000002c __RU_l__________________________________________________________ referenced,uptodate,lru
+pgbench_branches          2             0x0000000000000028 ___U_l__________________________________________________________ uptodate,lru
+pgbench_tellers           2             0x0000000000000028 ___U_l__________________________________________________________ uptodate,lru
 ```
+
+## %Total Memory
+
+`%Total` column reports the total usage of the cached memory. Cache memory is extracted from `/proc/meminfo`.
+`PostgreSQL` own `shared_buffers` is removed from this total as it is reported in the cache memory and can't be used by the page cache. 
+This way, `%Total` shows the relation's memory usage of the page cache memory.

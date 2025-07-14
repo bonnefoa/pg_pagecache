@@ -79,53 +79,6 @@ func readInt64SliceFromFile(f *os.File, size int, index int64) ([]uint64, error)
 	return unsafe.Slice(ui64Ptr, ui64Len), nil
 }
 
-func (s *State) getActivePages(pageStats *PageStats, mmapPtr uintptr, fileSizePtr uintptr, vec []byte, pageSize int64) (err error) {
-	ret, _, err := syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_RANDOM)
-	if ret != 0 {
-		return fmt.Errorf("syscall MADVISE failed: %v", err)
-	}
-
-	// Populate PTE
-	for i, v := range vec {
-		if v&0x1 > 0 {
-			_ = *(*byte)(unsafe.Pointer(mmapPtr + uintptr(int64(i)*pageSize)))
-		}
-	}
-
-	ret, _, err = syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_SEQUENTIAL)
-	if ret != 0 {
-		return fmt.Errorf("syscall MADVISE failed: %v", err)
-	}
-
-	numPages := len(vec)
-	indexPages := (int64(mmapPtr) / pageSize)
-	pagemapFlags, err := readInt64SliceFromFile(s.pagemapFile, numPages, indexPages)
-	if err != nil {
-		return fmt.Errorf("error reading pagemap flags: %v", err)
-	}
-
-	for _, pme := range pagemapFlags {
-		pfn := pme & 0x7FFFFFFFFFFFFF
-		if pfn == 0 {
-			continue
-		}
-
-		flagSlice, err := readInt64SliceFromFile(s.kpageFlagsFile, 1, int64(pfn))
-		if err != nil {
-			return err
-		}
-		var flags uint64
-		if s.rawFlags {
-			flags = expandOverloadedFlags(flagSlice[0], pme)
-		} else {
-			flags = wellKnownFlags(flagSlice[0])
-		}
-		pageStats.PageFlags[flags]++
-	}
-
-	return nil
-}
-
 // CanReadPageFlags returns true if page cache flags are readable
 func (s *State) CanReadPageFlags() bool {
 	if runtime.GOOS == "linux" && s.kpageFlagsFile != nil {
@@ -148,8 +101,8 @@ func (s *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 	// int mincore(void addr[.length], size_t length, unsigned char *vec);
 	// Build the result vec. From mincore doc: The vec argument must point to an
 	// array containing at least (length+PAGE_SIZE-1) / PAGE_SIZE bytes
-	pageNumber := (fileSize + pageSize - 1) / pageSize
-	vec := make([]byte, pageNumber)
+	numPages := (fileSize + pageSize - 1) / pageSize
+	vec := make([]byte, numPages)
 
 	mmapPtr := uintptr(unsafe.Pointer(&mmap[0]))
 	fileSizePtr := uintptr(fileSize)
@@ -170,9 +123,22 @@ func (s *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 	}
 
 	if s.CanReadPageFlags() {
-		err = s.getActivePages(&pageStats, mmapPtr, fileSizePtr, vec, pageSize)
+		err = s.populatePTE(mmapPtr, fileSizePtr, vec, pageSize)
 		if err != nil {
 			return pageStats, err
+		}
+		pagemapFlags, err := s.readPageMap(mmapPtr, int(numPages), pageSize)
+		if err != nil {
+			return pageStats, err
+		}
+		// Make sure to unmap before reading kpageflags
+		unix.Munmap(mmap)
+		pageFlags, err := s.readKpageFlags(pagemapFlags)
+		if err != nil {
+			return pageStats, err
+		}
+		for k, v := range pageFlags {
+			pageStats.PageFlags[k] += v
 		}
 	}
 

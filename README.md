@@ -13,8 +13,8 @@ Get the latest binary for your architecture:
 ```
 tag=$(curl -s 'https://api.github.com/repos/bonnefoa/pg_pagecache/releases/latest' | sed -n 's/ *"name": "\(v[0-9]*.[0-9]*.[0-9]*\).*/\1/p')
 file="pg_pagecache-${tag}-$(uname)-$(uname -m)"
-wget "https://github.com/bonnefoa/pg_pagecache/releases/download/${tag}/${file}"
-chmod a+x ${file}
+curl -L "https://github.com/bonnefoa/pg_pagecache/releases/download/${tag}/${file}" -o pg_pagecache
+chmod a+x pg_pagecache
 ```
 
 ## Usage

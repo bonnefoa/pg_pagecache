@@ -39,6 +39,12 @@ func (p *PgPageCache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (sha
 
 func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
 	baseDir := fmt.Sprintf("%s/base/%d", p.PgData, p.dbid)
+	_, err = os.Stat(baseDir)
+	if err != nil {
+		err = fmt.Errorf("Incorrect pg_data path: %v", err)
+		return
+	}
+
 	segno := 0
 
 	for {
@@ -50,7 +56,7 @@ func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
 		fullPath := filepath.Join(baseDir, filename)
 		_, err = os.Stat(fullPath)
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
+			if errors.Is(err, os.ErrNotExist) && segno > 0 {
 				// Last segment was processed, exit
 				return nil
 			}

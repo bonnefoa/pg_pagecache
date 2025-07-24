@@ -1,7 +1,10 @@
 package relation
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 
 	"github.com/bonnefoa/pg_pagecache/pagecache"
@@ -141,15 +144,20 @@ func (r *BaseInfo) ToFlagDetails() [][]string {
 
 // ToFlagDetails outputs page cache flags details
 func (r *RelInfo) ToFlagDetails() [][]string {
-	if r.PageStats.PageFlags == nil {
+	if r.PageStats.PageFlagsMap == nil {
 		return nil
 	}
 
+	pageFlagsValues := slices.Collect(maps.Values(r.PageStats.PageFlagsMap))
+	slices.SortFunc(pageFlagsValues, func(a, b pagecache.PageFlags) int {
+		return cmp.Compare(b.Count, a.Count)
+	})
+
 	var res [][]string
-	for flags, count := range r.PageStats.PageFlags {
+	for _, pfs := range pageFlagsValues {
 		res = append(res, []string{
-			r.Name, fmt.Sprintf("%d", count), fmt.Sprintf("0x%016x", flags),
-			pagecache.PageFlagShortName(flags), pagecache.PageFlagLongName(flags)})
+			r.Name, fmt.Sprintf("%d", pfs.Count), fmt.Sprintf("0x%016x", pfs.Flags),
+			pagecache.PageFlagShortName(pfs.Flags), pagecache.PageFlagLongName(pfs.Flags)})
 	}
 
 	return res

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"slices"
 
+	"github.com/bonnefoa/pg_pagecache/pagecache"
 	"github.com/bonnefoa/pg_pagecache/relation"
 )
 
@@ -16,6 +17,12 @@ func (p *PgPageCache) sortPartInfos(r []relation.PartInfo) {
 			return cmp.Or(cmp.Compare(b.PageCached, a.PageCached), cmp.Compare(a.Name, b.Name))
 		}
 		return cmp.Compare(a.Name, b.Name)
+	})
+}
+
+func (p *PgPageCache) sortPageFlags(r []pagecache.PageFlags) {
+	slices.SortFunc(r, func(a, b pagecache.PageFlags) int {
+		return cmp.Compare(a.Count, b.Count)
 	})
 }
 

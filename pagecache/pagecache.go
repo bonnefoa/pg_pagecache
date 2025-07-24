@@ -13,12 +13,17 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+type PageFlags struct {
+	Flags uint64
+	Count int
+}
+
 // PageStats stores page cache information
 type PageStats struct {
 	PageCached int
 	PageCount  int
 
-	PageFlags map[uint64]int
+	PageFlagsMap map[uint64]PageFlags
 }
 
 // State stores state for page cache related functions
@@ -34,11 +39,16 @@ func (p *PageStats) Add(b PageStats) {
 	p.PageCount += b.PageCount
 	p.PageCached += b.PageCached
 
-	if p.PageFlags == nil {
-		p.PageFlags = make(map[uint64]int)
+	if p.PageFlagsMap == nil {
+		p.PageFlagsMap = make(map[uint64]PageFlags)
 	}
-	for k, v := range b.PageFlags {
-		p.PageFlags[k] += v
+	for flags, v := range b.PageFlagsMap {
+		pfs, ok := p.PageFlagsMap[flags]
+		if !ok {
+			pfs.Flags = flags
+		}
+		pfs.Count += v.Count
+		p.PageFlagsMap[flags] = pfs
 	}
 }
 
@@ -82,7 +92,7 @@ func readInt64SliceFromFile(f *os.File, size int, index int64) ([]uint64, error)
 
 func (s *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageStats, error) {
 	var mmap []byte
-	pageStats := PageStats{0, 0, make(map[uint64]int, 0)}
+	pageStats := PageStats{0, 0, make(map[uint64]PageFlags, 0)}
 	// void *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset);
 	mmap, err := unix.Mmap(fd, 0, int(fileSize), unix.PROT_READ, unix.MAP_SHARED)
 	if err != nil {
@@ -133,12 +143,17 @@ func (s *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 		}
 		// Make sure to unmap before reading kpageflags
 		unix.Munmap(mmap)
-		pageFlags, err := s.readKpageFlags(pagemapFlags)
+		flagsCount, err := s.readKpageFlags(pagemapFlags)
 		if err != nil {
 			return pageStats, err
 		}
-		for k, v := range pageFlags {
-			pageStats.PageFlags[k] += v
+		for flags, flagsCount := range flagsCount {
+			pfs, ok := pageStats.PageFlagsMap[flags]
+			if !ok {
+				pfs = PageFlags{flags, 0}
+			}
+			pfs.Count += flagsCount
+			pageStats.PageFlagsMap[flags] = pfs
 		}
 	}
 
@@ -178,7 +193,7 @@ func NewPageCacheState(rawFlags bool) (state State) {
 
 // GetPageCacheInfo returns the page cache stats for the provided file
 func (s *State) GetPageCacheInfo(fullPath string, pagesize int64) (PageStats, error) {
-	pageStats := PageStats{0, 0, make(map[uint64]int, 0)}
+	pageStats := PageStats{0, 0, make(map[uint64]PageFlags, 0)}
 	file, err := os.Open(fullPath)
 	if err != nil {
 		return pageStats, fmt.Errorf("Error opening file %s: %v", fullPath, err)

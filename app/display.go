@@ -59,8 +59,13 @@ func (p *PgPageCache) outputJSON(header []string, values [][]string) error {
 // When grouping table, relation and relfilenode will always be empty
 func (p *PgPageCache) AdjustLine(line []string) []string {
 	var res []string
-	// Partition + table
-	res = append(res, line[0:2]...)
+	if len(p.partitions) == 1 && p.partitions[0].Name == "No partition" {
+		// table
+		res = append(res, line[1:2]...)
+	} else {
+		// Partition + table
+		res = append(res, line[0:2]...)
+	}
 	if !p.GroupTable {
 		// Relation + relfilenode
 		res = append(res, line[2:4]...)

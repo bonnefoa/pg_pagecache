@@ -26,7 +26,7 @@ func (p *PgPageCache) outputColumns(values [][]string, outputInfos []relation.Ou
 	}
 	w.Flush()
 
-	if p.pageCacheState.CanReadPageFlags() && !p.GroupTable {
+	if p.pageCacheState.CanReadPageFlags && !p.GroupTable {
 		fmt.Printf("\nPage Flags\n")
 		fmt.Fprintln(w, strings.Join(flagHeader, "\t"))
 		for _, v := range outputInfos {

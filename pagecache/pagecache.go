@@ -23,9 +23,10 @@ type PageStats struct {
 
 // State stores state for page cache related functions
 type State struct {
-	rawFlags       bool
-	pagemapFile    *os.File
-	kpageFlagsFile *os.File
+	rawFlags         bool
+	pagemapFile      *os.File
+	kpageFlagsFile   *os.File
+	CanReadPageFlags bool
 }
 
 // Add adds stats from provided pageStats
@@ -79,14 +80,6 @@ func readInt64SliceFromFile(f *os.File, size int, index int64) ([]uint64, error)
 	return unsafe.Slice(ui64Ptr, ui64Len), nil
 }
 
-// CanReadPageFlags returns true if page cache flags are readable
-func (s *State) CanReadPageFlags() bool {
-	if runtime.GOOS == "linux" && s.kpageFlagsFile != nil {
-		return true
-	}
-	return false
-}
-
 func (s *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageStats, error) {
 	var mmap []byte
 	pageStats := PageStats{0, 0, make(map[uint64]int, 0)}
@@ -115,20 +108,27 @@ func (s *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 
 	pageStats.PageCount = len(vec)
 	pageStats.PageCached = 0
-	for _, v := range vec {
+	cachedPageIndex := 0
+	for i, v := range vec {
 		// On return, the least significant bit of each byte will be set if the corresponding page is currently resident in memory, and be clear otherwise
 		if v&0x1 > 0 {
 			pageStats.PageCached = pageStats.PageCached + 1
+			cachedPageIndex = i
 		}
 	}
 
-	if s.CanReadPageFlags() {
+	if s.CanReadPageFlags && pageStats.PageCached > 0 {
 		err = s.populatePTE(mmapPtr, fileSizePtr, vec, pageSize)
 		if err != nil {
 			return pageStats, err
 		}
 		pagemapFlags, err := s.readPageMap(mmapPtr, int(numPages), pageSize)
 		if err != nil {
+			return pageStats, err
+		}
+		if pagemapFlags[cachedPageIndex]&PFN_MASK == 0 {
+			slog.Info("Can't read Page Frame Numbers, CAP_SYS_ADMIN may be missing. Page Flags won't be displayed.")
+			s.CanReadPageFlags = false
 			return pageStats, err
 		}
 		// Make sure to unmap before reading kpageflags
@@ -148,6 +148,7 @@ func (s *State) getPagecacheStats(fd int, fileSize int64, pageSize int64) (PageS
 // NewPageCacheState creates a new pagecache state
 func NewPageCacheState(rawFlags bool) (state State) {
 	state.rawFlags = rawFlags
+	state.CanReadPageFlags = false
 	if runtime.GOOS != "linux" {
 		// Nothing to do
 		return
@@ -166,6 +167,12 @@ func NewPageCacheState(rawFlags bool) (state State) {
 		slog.Info("Error opening /proc/kpageflags, page flags won't be available", "err", err)
 		return
 	}
+
+	// Assume true at this point. This may be switched to false if pfn are all 0
+	// which means we don't have CAP_SYS_ADMIN. It could be replaced by a capabilities
+	// check but this requires dedicated linkage options. In the end, it's simpler to
+	// try and check pfn's values
+	state.CanReadPageFlags = true
 	return
 }
 

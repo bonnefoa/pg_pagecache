@@ -74,7 +74,7 @@ func init() {
 	flag.BoolVar(&formatFlags.GroupPartition, "group_partition", false, "Group partition.")
 	flag.BoolVar(&formatFlags.GroupTable, "group_table", false, "Group indexes, toast with owning relation.")
 	flag.StringVar(&typeFlag, "format", "column", "Output format to use. Can be csv, column or json")
-	flag.StringVar(&unitFlag, "unit", "page", "Unit to use for paeg count and page cached. Can be page, kb or MB")
+	flag.StringVar(&unitFlag, "unit", "mb", "Unit to use for paeg count and page cached. Can be page, kb, mb or gb")
 	flag.StringVar(&sortFlag, "sort", "pagecached", "Field to use for sort. Can be relation, pagecount or pagecached")
 	flag.StringVar(&aggregationFlag, "aggregation", "none", "How to aggregate results. relation, table, table_only")
 }

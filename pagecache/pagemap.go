@@ -8,19 +8,23 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const PFN_MASK = 0x7FFFFFFFFFFFFF
+
 func (s *State) populatePTE(mmapPtr uintptr, fileSizePtr uintptr, cachedPages []byte, pageSize int64) (err error) {
+	// Turns off readahead
 	ret, _, err := syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_RANDOM)
 	if ret != 0 {
 		return fmt.Errorf("syscall MADVISE failed: %v", err)
 	}
 
-	// Populate PTE
+	// Force pagefault on all cached pages
 	for i, v := range cachedPages {
 		if v&0x1 > 0 {
 			_ = *(*byte)(unsafe.Pointer(mmapPtr + uintptr(int64(i)*pageSize)))
 		}
 	}
 
+	// Turns off harvesting reference bits
 	ret, _, err = syscall.Syscall(syscall.SYS_MADVISE, mmapPtr, fileSizePtr, unix.MADV_SEQUENTIAL)
 	if ret != 0 {
 		return fmt.Errorf("syscall MADVISE failed: %v", err)
@@ -41,7 +45,7 @@ func (s *State) readPageMap(mmapPtr uintptr, numPages int, pageSize int64) (page
 func (s *State) readKpageFlags(pagemapFlags []uint64) (pageFlags map[uint64]int, err error) {
 	pageFlags = make(map[uint64]int, 0)
 	for _, pme := range pagemapFlags {
-		pfn := pme & 0x7FFFFFFFFFFFFF
+		pfn := pme & PFN_MASK
 		if pfn == 0 {
 			continue
 		}

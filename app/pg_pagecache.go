@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 
 	"log/slog"
@@ -26,11 +27,12 @@ type PgPageCache struct {
 	pageSize       int64
 	fileMemory     int64 // File backed memory in KB
 	partitions     []relation.PartInfo
+	WalPageStats   pagecache.PageStats
 	pageCacheState pagecache.State
 }
 
 func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
-	baseDir := fmt.Sprintf("%s/base/%d", p.PgData, p.dbid)
+	baseDir := path.Join(p.PgData, "base", string(p.dbid))
 	_, err = os.Stat(baseDir)
 	if err != nil {
 		err = fmt.Errorf("Incorrect pg_data path: %v", err)
@@ -97,6 +99,25 @@ func (p *PgPageCache) fillPartitionStats() error {
 	return nil
 }
 
+// getWalPageStats fetches page cache usage of WAL files
+func (p *PgPageCache) getWalPageStats() (err error) {
+	baseDir := path.Join(p.PgData, "pg_wal")
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return fmt.Errorf("Error listing file: %v", err)
+	}
+
+	for _, entry := range entries {
+		fullPath := path.Join(baseDir, entry.Name())
+		pageStats, err := p.pageCacheState.GetPageCacheInfo(fullPath, p.pageSize)
+		if err != nil {
+			return err
+		}
+		p.WalPageStats.Add(pageStats)
+	}
+	return nil
+}
+
 // NewPgPagecache fetches the active database id and name and creates the pgPageCache instance
 func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPageCache) {
 	pgPagecache.conn = conn
@@ -105,7 +126,7 @@ func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPageCache) {
 	return
 }
 
-func (p *PgPageCache) getOutputInfos() []relation.OutputInfo {
+func (p *PgPageCache) getOutputInfos() (res []relation.OutputInfo) {
 	if p.GroupPartition {
 		return p.getAggregatedPartitions()
 	}
@@ -140,6 +161,12 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 
 	// Go through all tables and fill their pagecache
 	err = p.fillPartitionStats()
+	if err != nil {
+		return
+	}
+
+	// Get pagecache usage of wal files
+	err = p.getWalPageStats()
 	if err != nil {
 		return
 	}

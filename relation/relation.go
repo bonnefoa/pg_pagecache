@@ -99,6 +99,8 @@ func kindToString(kind rune) string {
 		return "Partition"
 	case 'T':
 		return "Table"
+	case 'W':
+		return "WAL"
 	}
 	return "Unkown"
 }

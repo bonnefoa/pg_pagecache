@@ -49,6 +49,7 @@ type RelInfo struct {
 var (
 	// TotalInfo stores the sum of all page stats. Used to display the last sum line.
 	TotalInfo = BaseInfo{Name: "Total", Kind: 'S'}
+	WalInfo   = BaseInfo{Name: "WAL", Kind: 'S'}
 )
 
 // GetPagestats returns the page stats

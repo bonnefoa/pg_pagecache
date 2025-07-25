@@ -10,6 +10,8 @@ import (
 	"github.com/bonnefoa/pg_pagecache/utils"
 )
 
+const NoPartition = "No partition"
+
 // OutputInfo represents an element that can will generate an output
 type OutputInfo interface {
 	ToStringArray(unit utils.Unit, pageSize int64, fileMemory int64) []string

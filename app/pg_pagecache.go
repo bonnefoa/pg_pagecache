@@ -26,8 +26,7 @@ type PgPageCache struct {
 	database       string
 	pageSize       int64
 	fileMemory     int64 // File backed memory in KB
-	partitions     []relation.PartInfo
-	WalPageStats   pagecache.PageStats
+	partitions     map[string]relation.PartInfo
 	pageCacheState pagecache.State
 }
 
@@ -178,10 +177,10 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 	slog.Info("Detected cached memory usage", "cache_memory", utils.FormatKBValue(p.fileMemory, utils.UnitGB))
 
 	// Filter partitions under the threshold
-	var filteredPartInfos []relation.PartInfo
-	for _, partInfo := range p.partitions {
+	filteredPartInfos := make(map[string]relation.PartInfo, 0)
+	for partName, partInfo := range p.partitions {
 		if partInfo.PageCached > p.CachedPageThreshold {
-			filteredPartInfos = append(filteredPartInfos, partInfo)
+			filteredPartInfos[partName] = partInfo
 			continue
 		}
 	}

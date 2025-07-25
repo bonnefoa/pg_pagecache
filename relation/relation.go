@@ -3,9 +3,7 @@ package relation
 import (
 	"context"
 	"fmt"
-	"maps"
 	"os"
-	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
@@ -13,7 +11,7 @@ import (
 
 // GetPartitionToTables returns the mapping between a parent partition and its children
 // Child includes toast table, toast table index and all indexes of the parent relation
-func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (partInfos []PartInfo, err error) {
+func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, pageThreshold int) (partitionMap map[string]PartInfo, err error) {
 	rows, err := conn.Query(ctx, `SELECT COALESCE(parent_idx.relname, parent.relname, 'No partition'), COALESCE(PPTI.relname, PT.relname, PI.relname, C.relname) as t, C.relname, C.relkind, COALESCE(NULLIF(C.relfilenode, 0), C.oid)
 		FROM pg_class C
 		LEFT JOIN pg_index ON pg_index.indexrelid = C.oid
@@ -41,7 +39,7 @@ func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, 
 		return
 	}
 
-	partitionMap := make(map[string]PartInfo, 0)
+	partitionMap = make(map[string]PartInfo, 0)
 	for rows.Next() {
 		var partName string
 		var tableName string
@@ -74,7 +72,6 @@ func GetPartitionToTables(ctx context.Context, conn *pgx.Conn, tables []string, 
 		partInfo.TableInfos[tableName] = tableInfo
 		partitionMap[partName] = partInfo
 	}
-	partInfos = slices.Collect(maps.Values(partitionMap))
 	return
 }
 

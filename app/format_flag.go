@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bonnefoa/pg_pagecache/relation"
+	"github.com/bonnefoa/pg_pagecache/utils"
 )
 
 // FormatSort represents the different sort options
@@ -16,7 +16,7 @@ type FormatType int
 
 // FormatFlags stores all format related flags
 type FormatFlags struct {
-	Unit           relation.FormatUnit
+	Unit           utils.Unit
 	Limit          int
 	Type           FormatType
 	Sort           FormatSort
@@ -48,11 +48,11 @@ var (
 		"pagecount":  SortPageCount,
 	}
 
-	formatUnitMap = map[string]relation.FormatUnit{
-		"page": relation.UnitPage,
-		"kb":   relation.UnitKB,
-		"mb":   relation.UnitMB,
-		"gb":   relation.UnitGB,
+	formatUnitMap = map[string]utils.Unit{
+		"page": utils.UnitPage,
+		"kb":   utils.UnitKB,
+		"mb":   utils.UnitMB,
+		"gb":   utils.UnitGB,
 	}
 
 	formatTypeMap = map[string]FormatType{
@@ -88,7 +88,7 @@ func parseSort(s string) (FormatSort, error) {
 	return sortOutput, nil
 }
 
-func parseUnitFlag(s string) (relation.FormatUnit, error) {
+func parseUnitFlag(s string) (utils.Unit, error) {
 	res, ok := formatUnitMap[strings.ToLower(s)]
 	if !ok {
 		err := fmt.Errorf("unknown unit: %v", s)

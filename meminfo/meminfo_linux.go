@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// GetCachedMemory fetches cached memory from /proc/memory. Returns memory in pages
+// GetCachedMemory fetches cached memory from /proc/memory. Returns memory in kb
 func GetCachedMemory(pageSize int64) (int64, error) {
 	file, err := os.Open("/proc/meminfo")
 	if err != nil {
@@ -38,7 +38,7 @@ func GetCachedMemory(pageSize int64) (int64, error) {
 
 		// meminfo provides memory in kB
 		// We want to convert it in pages
-		return value / (pageSize / 1024), err
+		return value, err
 	}
 
 	return 0, fmt.Errorf("Cached memory not found")

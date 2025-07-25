@@ -62,9 +62,10 @@ func (p *PageStats) GetCachedPct() string {
 }
 
 // GetTotalCachedPct returns the percent of total cached pages as a string
-func (p *PageStats) GetTotalCachedPct(totalCached int64) string {
+// totalCached is in KB
+func (p *PageStats) GetTotalCachedPct(pageSize int64, totalCached int64) string {
 	if p.PageCached > 0 && totalCached > 0 {
-		value := 100 * float64(p.PageCached) / float64(totalCached)
+		value := 100 * (float64(p.PageCached) * float64(pageSize) / 1024) / float64(totalCached)
 		return strconv.FormatFloat(value, 'f', 2, 64)
 	}
 	return "0"

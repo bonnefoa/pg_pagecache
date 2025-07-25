@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// GetCachedMemory fetches the size of cached memory in pages
+// GetCachedMemory fetches the size of cached memory in kb
 func GetCachedMemory(pageSize int64) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -43,7 +43,7 @@ func GetCachedMemory(pageSize int64) (int64, error) {
 			return 0, err
 		}
 
-		return file_backed_pages, err
+		return file_backed_pages * pageSize / 1024, err
 	}
 
 	return 0, fmt.Errorf("cached memory not found")

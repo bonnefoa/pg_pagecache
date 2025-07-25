@@ -12,6 +12,7 @@ import (
 	"github.com/bonnefoa/pg_pagecache/meminfo"
 	"github.com/bonnefoa/pg_pagecache/pagecache"
 	"github.com/bonnefoa/pg_pagecache/relation"
+	"github.com/bonnefoa/pg_pagecache/utils"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -23,18 +24,18 @@ type PgPageCache struct {
 	dbid           uint32
 	database       string
 	pageSize       int64
-	fileMemory     int64 // Cache memory without shared_buffers
+	fileMemory     int64 // Cache memory without shared_buffers, in KB
 	partitions     []relation.PartInfo
 	pageCacheState pagecache.State
 }
 
-// getSharedBuffers returns the amount of shared_buffers memory in 4KB pages
-func (p *PgPageCache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (sharedBuffers int, err error) {
+// getSharedBuffers returns the amount of shared_buffers memory in KB
+func (p *PgPageCache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (sharedBuffers int64, err error) {
 	row := conn.QueryRow(ctx, "SELECT setting::int FROM pg_settings where name='shared_buffers'")
 	err = row.Scan(&sharedBuffers)
 
-	// pg_settings uses 8Kb blocks, we want 4KB pages
-	return sharedBuffers / 2, err
+	// pg_settings uses 8Kb blocks, we want KB
+	return sharedBuffers * 8, err
 }
 
 func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
@@ -157,14 +158,15 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("Couldn't get cached_memory: %v", err)
 	}
-	slog.Info("Detected cached memory usage", "cached_memory", cachedMemory)
+	slog.Info("Detected cached memory usage", "cache_memory", utils.FormatKBValue(cachedMemory, utils.UnitGB))
 
 	sharedBuffers, err := p.getSharedBuffers(ctx, p.conn)
 	if err != nil {
 		return fmt.Errorf("Couldn't get shared_buffers: %v", err)
 	}
-	slog.Info("Detected shared_buffers", "shared_buffers", sharedBuffers)
-	p.fileMemory = cachedMemory - int64(sharedBuffers)
+	slog.Info("Detected shared_buffers", "shared_buffers", utils.FormatKBValue(sharedBuffers, utils.UnitGB))
+	p.fileMemory = cachedMemory - sharedBuffers
+	slog.Info("File memory, excluding shared_buffers", "file_memory", utils.FormatKBValue(p.fileMemory, utils.UnitGB))
 
 	// Filter partitions under the threshold
 	var filteredPartInfos []relation.PartInfo

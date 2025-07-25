@@ -67,6 +67,7 @@ func (p *PgPageCache) getNoAggregations() (outputInfos []relation.OutputInfo) {
 		outputInfos = append(outputInfos, &relinfo)
 		total.Add(relinfo.PageStats)
 	}
+	outputInfos = append(outputInfos, &relation.WalInfo)
 	outputInfos = append(outputInfos, &total)
 	return
 }

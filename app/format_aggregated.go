@@ -11,8 +11,9 @@ func (p *PgPageCache) getAggregatedPartitions() (outputInfos []relation.OutputIn
 	i := 0
 	total := relation.TotalInfo
 
-	p.sortPartInfos(p.partitions)
-	for _, partition := range p.partitions {
+	partitionSlice := slices.Collect(maps.Values(p.partitions))
+	p.sortPartInfos(partitionSlice)
+	for _, partition := range partitionSlice {
 		if p.Limit > 0 && i >= p.Limit {
 			break
 		}
@@ -37,6 +38,7 @@ func (p *PgPageCache) getAggregatedPartitions() (outputInfos []relation.OutputIn
 			}
 		}
 	}
+	outputInfos = append(outputInfos, &relation.WalInfo)
 	outputInfos = append(outputInfos, &total)
 	return
 }
@@ -73,6 +75,7 @@ func (p *PgPageCache) getAggregatedTables() (outputInfos []relation.OutputInfo) 
 		}
 	}
 
+	outputInfos = append(outputInfos, &relation.WalInfo)
 	outputInfos = append(outputInfos, &total)
 	return
 }

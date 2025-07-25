@@ -31,7 +31,7 @@ type PgPageCache struct {
 }
 
 func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
-	baseDir := path.Join(p.PgData, "base", string(p.dbid))
+	baseDir := path.Join(p.PgData, "base", fmt.Sprintf("%d", p.dbid))
 	_, err = os.Stat(baseDir)
 	if err != nil {
 		err = fmt.Errorf("Incorrect pg_data path: %v", err)
@@ -99,22 +99,32 @@ func (p *PgPageCache) fillPartitionStats() error {
 }
 
 // getWalPageStats fetches page cache usage of WAL files
-func (p *PgPageCache) getWalPageStats() (err error) {
+func (p *PgPageCache) getWalPageStats() (walPageStats pagecache.PageStats, err error) {
 	baseDir := path.Join(p.PgData, "pg_wal")
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
-		return fmt.Errorf("Error listing file: %v", err)
+		err = fmt.Errorf("Error listing file: %v", err)
+		return
 	}
 
 	for _, entry := range entries {
+		var pageStats pagecache.PageStats
+		var fsInfo os.FileInfo
 		fullPath := path.Join(baseDir, entry.Name())
-		pageStats, err := p.pageCacheState.GetPageCacheInfo(fullPath, p.pageSize)
+		fsInfo, err = os.Stat(fullPath)
 		if err != nil {
-			return err
+			return
 		}
-		p.WalPageStats.Add(pageStats)
+		if fsInfo.IsDir() {
+			continue
+		}
+		pageStats, err = p.pageCacheState.GetPageCacheInfo(fullPath, p.pageSize)
+		if err != nil {
+			return
+		}
+		walPageStats.Add(pageStats)
 	}
-	return nil
+	return
 }
 
 // NewPgPagecache fetches the active database id and name and creates the pgPageCache instance
@@ -165,7 +175,7 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 	}
 
 	// Get pagecache usage of wal files
-	err = p.getWalPageStats()
+	relation.WalInfo.PageStats, err = p.getWalPageStats()
 	if err != nil {
 		return
 	}

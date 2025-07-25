@@ -9,7 +9,7 @@ import (
 
 	"log/slog"
 
-	"github.com/bonnefoa/pg_pagecache/meminfo"
+	"github.com/bonnefoa/pg_pagecache/memory"
 	"github.com/bonnefoa/pg_pagecache/pagecache"
 	"github.com/bonnefoa/pg_pagecache/relation"
 	"github.com/bonnefoa/pg_pagecache/utils"
@@ -24,18 +24,9 @@ type PgPageCache struct {
 	dbid           uint32
 	database       string
 	pageSize       int64
-	fileMemory     int64 // Cache memory without shared_buffers, in KB
+	fileMemory     int64 // File backed memory in KB
 	partitions     []relation.PartInfo
 	pageCacheState pagecache.State
-}
-
-// getSharedBuffers returns the amount of shared_buffers memory in KB
-func (p *PgPageCache) getSharedBuffers(ctx context.Context, conn *pgx.Conn) (sharedBuffers int64, err error) {
-	row := conn.QueryRow(ctx, "SELECT setting::int FROM pg_settings where name='shared_buffers'")
-	err = row.Scan(&sharedBuffers)
-
-	// pg_settings uses 8Kb blocks, we want KB
-	return sharedBuffers * 8, err
 }
 
 func (p *PgPageCache) fillRelinfo(relinfo *relation.RelInfo) (err error) {
@@ -103,7 +94,6 @@ func (p *PgPageCache) fillPartitionStats() error {
 		}
 		p.partitions[partName] = partInfo
 	}
-	slog.Info("Pagestats finished")
 	return nil
 }
 
@@ -154,19 +144,11 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 		return
 	}
 
-	cachedMemory, err := meminfo.GetCachedMemory(p.pageSize)
+	p.fileMemory, err = memory.GetCachedMemory(p.pageSize)
 	if err != nil {
 		return fmt.Errorf("Couldn't get cached_memory: %v", err)
 	}
-	slog.Info("Detected cached memory usage", "cache_memory", utils.FormatKBValue(cachedMemory, utils.UnitGB))
-
-	sharedBuffers, err := p.getSharedBuffers(ctx, p.conn)
-	if err != nil {
-		return fmt.Errorf("Couldn't get shared_buffers: %v", err)
-	}
-	slog.Info("Detected shared_buffers", "shared_buffers", utils.FormatKBValue(sharedBuffers, utils.UnitGB))
-	p.fileMemory = cachedMemory - sharedBuffers
-	slog.Info("File memory, excluding shared_buffers", "file_memory", utils.FormatKBValue(p.fileMemory, utils.UnitGB))
+	slog.Info("Detected cached memory usage", "cache_memory", utils.FormatKBValue(p.fileMemory, utils.UnitGB))
 
 	// Filter partitions under the threshold
 	var filteredPartInfos []relation.PartInfo

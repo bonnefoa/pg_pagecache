@@ -1,6 +1,6 @@
 //go:build darwin
 
-package meminfo
+package memory
 
 import (
 	"bufio"

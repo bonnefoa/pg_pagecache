@@ -135,14 +135,19 @@ func NewPgPagecache(conn *pgx.Conn, cliArgs CliArgs) (pgPagecache PgPageCache) {
 	return
 }
 
-func (p *PgPageCache) getOutputInfos() (res []relation.OutputInfo) {
+func (p *PgPageCache) getOutputInfos() (outputInfos []relation.OutputInfo) {
 	if p.GroupPartition {
-		return p.getAggregatedPartitions()
+		outputInfos = p.getAggregatedPartitions()
+	} else if p.GroupTable {
+		outputInfos = p.getAggregatedTables()
+	} else {
+		outputInfos = p.getNoAggregations()
 	}
-	if p.GroupTable {
-		return p.getAggregatedTables()
+	if p.ScanWal {
+		outputInfos = append(outputInfos, &relation.WalInfo)
 	}
-	return p.getNoAggregations()
+	outputInfos = append(outputInfos, &relation.TotalInfo)
+	return
 }
 
 // Run executes the pg_pagecache. It will fetch database and relation
@@ -174,10 +179,12 @@ func (p *PgPageCache) Run(ctx context.Context) (err error) {
 		return
 	}
 
-	// Get pagecache usage of wal files
-	relation.WalInfo.PageStats, err = p.getWalPageStats()
-	if err != nil {
-		return
+	if p.ScanWal {
+		// Get pagecache usage of wal files
+		relation.WalInfo.PageStats, err = p.getWalPageStats()
+		if err != nil {
+			return
+		}
 	}
 
 	p.fileMemory, err = memory.GetCachedMemory(p.pageSize)

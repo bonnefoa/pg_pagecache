@@ -9,7 +9,6 @@ import (
 
 func (p *PgPageCache) getAggregatedPartitions() (outputInfos []relation.OutputInfo) {
 	i := 0
-	total := relation.TotalInfo
 
 	partitionSlice := slices.Collect(maps.Values(p.partitions))
 	p.sortPartInfos(partitionSlice)
@@ -21,7 +20,7 @@ func (p *PgPageCache) getAggregatedPartitions() (outputInfos []relation.OutputIn
 
 		// Add parent partition
 		outputInfos = append(outputInfos, &partition)
-		total.Add(partition.PageStats)
+		relation.TotalInfo.Add(partition.PageStats)
 
 		tableInfos := slices.Collect(maps.Values(partition.TableInfos))
 		p.sortTableInfos(tableInfos)
@@ -38,14 +37,11 @@ func (p *PgPageCache) getAggregatedPartitions() (outputInfos []relation.OutputIn
 			}
 		}
 	}
-	outputInfos = append(outputInfos, &relation.WalInfo)
-	outputInfos = append(outputInfos, &total)
 	return
 }
 
 func (p *PgPageCache) getAggregatedTables() (outputInfos []relation.OutputInfo) {
 	i := 0
-	total := relation.TotalInfo
 
 	var tableInfos []relation.TableInfo
 	// We don't care about partitions, flatten TableInfo -> []Relinfo map
@@ -61,7 +57,7 @@ func (p *PgPageCache) getAggregatedTables() (outputInfos []relation.OutputInfo) 
 		i++
 
 		outputInfos = append(outputInfos, &tableInfo)
-		total.Add(tableInfo.PageStats)
+		relation.TotalInfo.Add(tableInfo.PageStats)
 
 		if p.GroupTable {
 			// Skip printing children
@@ -75,7 +71,8 @@ func (p *PgPageCache) getAggregatedTables() (outputInfos []relation.OutputInfo) 
 		}
 	}
 
-	outputInfos = append(outputInfos, &relation.WalInfo)
-	outputInfos = append(outputInfos, &total)
+	if p.ScanWal {
+		outputInfos = append(outputInfos, &relation.WalInfo)
+	}
 	return
 }

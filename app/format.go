@@ -59,15 +59,12 @@ func (p *PgPageCache) getNoAggregations() (outputInfos []relation.OutputInfo) {
 	}
 	p.sortRelInfos(relinfos)
 
-	total := relation.TotalInfo
 	for i, relinfo := range relinfos {
 		if p.Limit > 0 && i >= p.Limit {
 			break
 		}
 		outputInfos = append(outputInfos, &relinfo)
-		total.Add(relinfo.PageStats)
+		relation.TotalInfo.Add(relinfo.PageStats)
 	}
-	outputInfos = append(outputInfos, &relation.WalInfo)
-	outputInfos = append(outputInfos, &total)
 	return
 }

@@ -23,6 +23,7 @@ type CliArgs struct {
 	CachedPageThreshold int
 	Cpuprofile          string
 	RawFlags            bool
+	ScanWal             bool
 
 	FormatFlags
 }
@@ -35,6 +36,7 @@ func init() {
 	flag.StringVar(&cliArgs.Cpuprofile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&relationsFlag, "relations", "", "Filter on a specific relations (separated with commas)")
 	flag.BoolVar(&cliArgs.RawFlags, "raw_flags", false, "Raw flag mode")
+	flag.BoolVar(&cliArgs.ScanWal, "scan_wal", true, "Scan pagecache usage of WAL files")
 }
 
 // ParseCliArgs returns a CliArgs with parsed values
